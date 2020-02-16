@@ -1,0 +1,68 @@
+PRINT_NUMS_FROM_B2:  
+            CALL    set_POS_B2 
+
+            LD      a,(sub08461+2) 
+            CALL    PRINT_NUM2_B2 
+            LD      a,(sub08461+1) 
+            CALL    PRINT_NUM2_B2 
+            LD      a," " 
+            CALL    PRINT_CHAR_B2 
+
+            LD      hl,(LAST_PLAYER_BANK_B2) 
+            LD      a,(hl) 
+            CALL    PRINT_NUM2_B2 
+            LD      a," " 
+            CALL    PRINT_CHAR_B2 
+
+            RET      
+
+SET_POS_B2:          
+            DI       
+            LD      a,(PORTBASE) 
+            ADD     a,$06 
+            LD      c,a 
+            LD      a,00000011b 
+            OUT     (C),a 
+            LD      bc,$0114 
+            CALL    SET_POS 
+            LD      a,(PORTBASE) 
+            ADD     a,$06 
+            LD      c,a 
+            LD      a,00000010b 
+            OUT     (C),a 
+            EI       
+            RET      
+PRINT_NUM2_B2:       
+            DI       
+            PUSH    af 
+            LD      a,(PORTBASE) 
+            ADD     a,$06 
+            LD      c,a 
+            LD      a,00000011b 
+            OUT     (C),a 
+            POP     af 
+            CALL    PRINT_NUM2 
+            LD      a,(PORTBASE) 
+            ADD     a,$06 
+            LD      c,a 
+            LD      a,00000010b 
+            OUT     (C),a 
+            EI       
+            RET      
+PRINT_CHAR_B2:       
+            DI       
+            PUSH    af 
+            LD      a,(PORTBASE) 
+            ADD     a,$06 
+            LD      c,a 
+            LD      a,00000011b 
+            OUT     (C),a 
+            POP     af 
+            CALL    PRINT_CHARACTER 
+            LD      a,(PORTBASE) 
+            ADD     a,$06 
+            LD      c,a 
+            LD      a,00000010b 
+            OUT     (C),a 
+            EI       
+            RET      

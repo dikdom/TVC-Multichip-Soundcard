@@ -1,0 +1,1181 @@
+0000                             ;----------------------------------------------
+0000                             ; 
+0000                             ; SNDMgc test program, SAA1099 test, based on
+0000                             ; Miklós Hanák work
+0000                             ; 
+0000                             ; 
+0000                             ; SAA1099P test program for TVC
+0000                             ; 2013 RetroHW
+0000                             ; 
+0000                             ; Source:
+0000                             ;        http://sdinterface.atw.hu (TVC demo)
+0000                             ;        http://wwww.micklab.narod.ru (ETunes)
+0000                             ;        http://www.keprt.cz (Songs)
+0000                             ;----------------------------------------------
+0000                             ; 
+0000                             ; SAA1099 Address port is $n3, where n is the slot (1-4) the card is. Example $13
+0000                             ; SAA1099 Data port is $n2, where n is the slot (1-4) the card is. Example $12
+0000                             ; 
+0000                SAAADDRPORT:   =   $43   
+0000                SAADATAPORT:   =   SAAADDRPORT-1   
+0000                          .BINFROM   PROGRAM_START   
+0000                          .BINTO   PROGRAM_END   
+195F                          .ORG   (6639 - $90)   
+195F                PROGRAM_START:      
+195F                          .CPU   Z80   
+195F                             ;00 	filetype 	fájl típus, 01h/11h: pufferelt/nem pufferelt
+195F                             ;01 	copyprotect 	ha 00h akkor nem védett a fájl
+195F                             ;02-03 	blocknumber lo/hi 	A program által elfoglalt 80h méretű blokkok száma
+195F                             ;04 	lastblockbytes 	Az utolsó 80h-s blokkban található hasznos bájtok száma (0-127)
+195F                             ;05-7F 	00h 	Mindig 00h
+195F                             ;Nem pufferelt file-ok 16-bájtos fejléce
+195F                             ;80 	00h 	Mindig 00h
+195F                             ;81 	type 	01 - programfájl, 00 - adat
+195F                             ;82-83 	prgsize lo/hi 	a program hossza
+195F                             ;84 	autorun 	automatikus indítás, ha $ff akkor igen
+195F                             ;85-8E 	00h 	Mindig 00h
+195F                             ;8F 	versionnumber 	Változatszám (többnyire nem használják)
+195F                             ;90-n 	databytes 	A program adatbájtjai, egészen a fájl végéig.
+195F                             ; fileType - $01 buffered, $11 non-buffered
+195F   11                     DB   $11   
+1960                             ; copyprotect - $00 no protection
+1960   00                     DB   $00   
+1961                             ; number of blocks, lo-hi order. Program size in $80 sized blocks
+1961   3D                     DB   lsb((PROGRAM_END - PROGRAM_START - 1) / $80)   
+1962   00                     DB   msb((PROGRAM_END - PROGRAM_START - 1) / $80)   
+1963                             ; lastblock bytes (0-$7f)
+1963   73                     DB   (PROGRAM_END - PROGRAM_START) % $80   
+1964                             ; filled with zeroes
+1964   00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 BSZ   ($80-$05)   
+19DF                             ; always $00
+19DF   00                     DB   $00   
+19E0                             ; type of file: 01h program file, $00 data file
+19E0   01                     DB   $01   
+19E1                             ; program size in bytes lo/hi order
+19E1   F3                     DB   lsb(PROGRAM_END - PROGRAM_START)   
+19E2   1E                     DB   msb(PROGRAM_END - PROGRAM_START)   
+19E3                             ; autorun if $ff
+19E3   00                     DB   $00   
+19E4                             ; always $00
+19E4   00 00 00 00 00 00 00 00 00 00 00 BSZ   ($90-$85)   
+19EF                          .ORG   6639   
+19EF   0F 0A 00 DD            DB   0FH,0AH,0,0DDH   
+19F3   20 55 53 52            DB   " USR"   
+19F7   96 36 36 35 39         DB   96H,"6659"   
+19FC   95 FF 00 00 00 00 00   DB   95H,0FFH,0,0,0,0,0   ; 20 byte program header
+1A03                             ; 
+1A03                PROG:        
+1A03   C3 08 1A               JP   pmain   ; program start
+1A06                             ; 
+1A06                PSAVE:       
+1A06   70                     DB   070h   ; P_SAVE saved value (mem paging during program start)
+1A07                XITFLAG:      
+1A07   00                     DB   0   
+1A08                             ;----------------------------------------------
+1A08                             ;----------------- MAINPROGRAM -----------------
+1A08                             ;----------------------------------------------
+1A08   D9           PMAIN:    EXX      ; mainprogram
+1A09   C5                     PUSH   bc   
+1A0A   D5                     PUSH   de   
+1A0B   E5                     PUSH   hl   
+1A0C   D9                     EXX      
+1A0D   3A 03 00               LD   a,(00003h)   ; A reg.= P_SAVE (actual memorypaging)
+1A10   32 06 1A               LD   (psave),a   ; save into our own variable
+1A13                             ; 
+1A13   0E 00                  LD   c,000h   ; VMODE graphics mode: 0-2 colors 1-four 2-sixteen colors
+1A15   F7                     RST   30h   
+1A16   04                     DB   4   
+1A17   21 D8 1A               LD   hl,introtxt   ; print intro text
+1A1A   CD CA 1A               CALL   ut_prnt   
+1A1D   0E 43                  LD   c,SAAADDRPORT   
+1A1F   06 1C                  LD   b,28   
+1A21   ED 41                  OUT   (c),b   
+1A23   0E 42                  LD   c,SAADATAPORT   
+1A25   06 01                  LD   b,1   
+1A27   ED 41                  OUT   (c),b   ;Enabling SAA
+1A29   0E 03                  LD   c,3   
+1A2B   06 02                  LD   b,2   
+1A2D   ED 41                  OUT   (c),b   
+1A2F   21 46 1B               LD   hl,songdata   
+1A32   22 A0 33               LD   (EPlayerInit+1),hl   ; Passing the song title
+1A35   CD 9F 33               CALL   EPlayerInit   ; initializing the player
+1A38   CD 68 1A               CALL   intat   ; Setting up interrupt
+1A3B                TASK:        
+1A3B   F3                     DI      
+1A3C   0E 58                  LD   c,058H   
+1A3E   ED 78                  IN   a,(c)   
+1A40   EE BF                  XOR   10111111b   ; Exit on pressing "Q"
+1A42   CA 49 1A               JP   z,exit   
+1A45   FB                     EI      
+1A46   C3 3B 1A               JP   task   
+1A49                EXIT:        
+1A49   CD 8A 1A               CALL   intvissza   ; reset interrupt
+1A4C   0E 43                  LD   c,SAAADDRPORT   
+1A4E   06 1C                  LD   b,28   
+1A50   ED 41                  OUT   (c),b   
+1A52   0E 42                  LD   c,SAADATAPORT   
+1A54   06 00                  LD   b,0   
+1A56   ED 41                  OUT   (c),b   ; Disabling SAA
+1A58   F7                     RST   30h   
+1A59   05                     DB   5   ; CLS
+1A5A   3A 06 1A               LD   a,(psave)   ; Saved P_SAVE into register A
+1A5D   32 03 00               LD   (0003h),a   ; restoring original memory paging
+1A60   D3 02                  OUT   (002h),a   
+1A62   D9                     EXX      
+1A63   E1                     POP   hl   
+1A64   D1                     POP   de   
+1A65   C1                     POP   bc   
+1A66   D9                     EXX      
+1A67   C9                     RET      
+1A68                             ;----------------------------------------------
+1A68                             ;----------------- The End --------------------
+1A68                             ;----------------------------------------------
+1A68                             ;------------Interrupt handler-----------------
+1A68                             ; átírás saját megszakításkezelõ alprogramra
+1A68                INTAT:       
+1A68   F3                     DI      ; megszak. tilt
+1A69   3A 12 0B               LD   a,(0B12h)   ; A reg.= Port5 tükörképe
+1A6C   CB AF                  RES   5,a   ; hang IT tiltva
+1A6E   CB A7                  RES   4,a   ; hangjel is tiltva
+1A70   32 12 0B               LD   (0B12h),a   ; új érték a memóriába
+1A73   D3 05                  OUT   (005h),a   ; és a portra
+1A75   3E 0A                  LD   a,00Ah   ; CRTC R10-es regiszterében a kurzor engedélyezése
+1A77   D3 70                  OUT   (070h),a   
+1A79   3E 03                  LD   a,003h   
+1A7B   D3 71                  OUT   (071h),a   
+1A7D   3E C3                  LD   a,0C3h   ; A reg.= JP XXXX kódja
+1A7F   32 38 00               LD   (0038h),a   ; megszakításrutin elsõ bájtjának átírása
+1A82   21 AF 1A               LD   hl,sajatint   
+1A85   22 39 00               LD   (0039h),hl   ; ugróutasítás célcím beírása
+1A88   FB                     EI      ; megszak. eng.
+1A89   C9                     RET      
+1A8A                INTVISSZA:      
+1A8A   F3                     DI      ; megszak. tilt
+1A8B   21 AC 1A               LD   hl,L1D2F   ; HL= eredeti megszak. rutin visszaállítandó kódrészlete
+1A8E   11 38 00               LD   de,0038h   ; DE= megszak. címe
+1A91   01 03 00               LD   bc,0003h   ; BC= 3 bájt lesz
+1A94   ED B0                  LDIR      ; bájtok másolása
+1A96   3A 12 0B               LD   a,(0B12h)   ; A reg.= Port5 tükörképe
+1A99   CB AF                  RES   5,a   ; hang IT tiltva
+1A9B   CB A7                  RES   4,a   ; hangjel is tiltva
+1A9D   32 12 0B               LD   (0B12h),a   ; új érték a memóriába
+1AA0   D3 05                  OUT   (005h),a   ; és a portra
+1AA2   3E 0A                  LD   a,00Ah   ; CRTC R10-es regiszterében a kurzor engedélyezése
+1AA4   D3 70                  OUT   (070h),a   
+1AA6   3E 03                  LD   a,003h   
+1AA8   D3 71                  OUT   (071h),a   
+1AAA   FB                     EI      ; megszak. eng.
+1AAB   C9                     RET      
+1AAC                             ; 
+1AAC                             ;	Eredeti megszak. rutin visszaállítandó kódrészlete
+1AAC                             ; 
+1AAC   F5           L1D2F:    PUSH   af   
+1AAD   3E 70                  LD   a,070h   
+1AAF                             ; 
+1AAF                             ; 
+1AAF                             ;	Saját megszakítás-kiszolgáló rutin
+1AAF                             ; 
+1AAF                SAJATINT:      
+1AAF   F3                     DI      ; további megszak. tilt
+1AB0   F5                     PUSH   af   ; A reg. mentése
+1AB1   3E 90                  LD   a,090h   ; memórialapozás: U0,U1,VID,U3
+1AB3   D3 02                  OUT   (002h),a   ; memórialapozás beállítása
+1AB5   D3 07                  OUT   (007h),a   ; kurzor/hang megszak. kérés törlése
+1AB7   E5                     PUSH   hl   
+1AB8   C5                     PUSH   bc   
+1AB9   D5                     PUSH   de   
+1ABA   F5                     PUSH   af   
+1ABB   CD A5 33               CALL   EPlayerPlay   
+1ABE   F1                     POP   af   
+1ABF   D1                     POP   de   
+1AC0   C1                     POP   bc   
+1AC1   E1                     POP   hl   
+1AC2   3A 03 00               LD   a,(0003h)   ; eredeti memórialapozás vissza
+1AC5   D3 02                  OUT   (002h),a   
+1AC7   F1                     POP   af   ; A reg. vissza
+1AC8   FB                     EI      ; megszak. eng
+1AC9   C9                     RET      ; visszatérés
+1ACA                             ;------------------------
+1ACA                             ;szubrutinok vége
+1ACA                             ;----------------------------------------------
+1ACA                             ;----------------- függvények -----------------
+1ACA                             ;----------------------------------------------
+1ACA                             ;----------------------------------------------
+1ACA                             ;	Szöveg kiírása az aktuális vagy adott xy pozícióba
+1ACA                             ;	in:  B  - X poz. ("ut_prn0"-nál belépve)
+1ACA                             ;	     C  - Y poz. ("ut_prn0"-nál belépve)
+1ACA                             ;	     HL - 0-val lezárt string kezdete
+1ACA                             ;	out: HL - a lezáró nulla utáni cím
+1ACA                             ; 
+1ACA   01 00 00     UT_PRNT:   LD   bc,0000h   ; aktuális pozícióba ír
+1ACD   F7           UT_PRN0:   RST   30h   ; kurzor-pozicionálás
+1ACE   23                     DB   023h   ; CPOS
+1ACF   7E           UT_PRN1:   LD   a,(hl)   
+1AD0   23                     INC   hl   
+1AD1   B7                     OR   a   
+1AD2   C8                     RET   z   
+1AD3   4F                     LD   c,a   
+1AD4   F7                     RST   30h   ; karakter kiírása
+1AD5   21                     DB   021h   ; ED_CHOUT
+1AD6   18 F7                  JR   ut_prn1   
+1AD8                             ;----------------------------------------------
+1AD8                             ;----------------------------------------------
+1AD8                             ;----------------------------------------------
+1AD8                INTROTXT:      
+1AD8   53 41 41 31 30 39 39 50 20 74 65 73 7A 74 20 70 72 6F 67 72 61 6D 20 54 56 43 2D 72 65 0D 0A 0D 0A DB   "SAA1099P teszt program TVC-re\r\n\r\n"   
+1AF9   4B 69 6C 91 70 91 73 20 51 20 62 69 6C 6C 65 6E 74 79 98 20 6D 65 67 6E 79 6F 6D 90 73 90 76 61 6C 2E 2E 2E 0D 0A 0D 0A DB   "Kil\u0091p\u0091s Q billenty\u0098 megnyom\u0090s\u0090val...\r\n\r\n"   
+1B21   0D 0A 0D 0A 65 76 69 6C 2E 73 6E 67 0D 0A 0D 0A 0D 0A 0D 0A 32 30 31 33 20 52 65 74 72 6F 48 57 0D 0A DB   "\r\n\r\nevil.sng\r\n\r\n\r\n\r\n2013 RetroHW\r\n"   
+1B43   0D 0A 00               DB   "\r\n\u0000"   
+1B46                SONGDATA:      
+1B46                             ;.include enola.dat
+1B46   31 17 4F 17 1D 17 2D 17 2D 17 45 54 72 61 63 6B 65 72 20 28 43 29 20 42 59 20 45 53 49 2E 2E D2 05 D2 11 D2 51 52 2E 93 D5 95 D5 96 D5 95 D5 93 D5 98 D5 96 D5 95 D5 93 D5 95 D5 96 D5 98 D5 9A D5 98 D5 96 D5 95 D5 51 52 93 D5 95 D5 96 D5 95 D5 93 D5 98 D5 96 D5 95 D5 92 D5 93 D5 95 D5 96 D5 98 D5 9A D5 96 D5 95 D5 51 52 93 D5 95 D5 96 D5 95 D5 93 D5 98 D5 96 D5 95 D5 93 D5 95 D5 96 D5 98 D5 9A D5 98 D5 96 D5 95 D5 51 52 98 D5 9A D5 9B D5 9A D5 98 D5 9D D5 9B D5 9A D5 98 D5 9A D5 9B D5 9D D5 9F D5 9D D5 9B D5 9A D5 51 52 98 D5 9A D5 9B D5 9A D5 98 D5 9D D5 9B D5 9A D5 97 D5 98 D5 9A D5 9B D5 9D D5 9F D5 9B D5 9A D5 51 52 02 93 D9 95 D9 96 D9 95 F9 51 53 18 A0 EF 19 D2 1A D2 18 A4 D2 14 D2 11 D7 A2 D7 12 D2 13 D2 11 A4 D2 12 D2 13 D2 14 D2 15 D2 16 D2 17 D2 18 D2 19 D7 1A D2 1C D2 51 54 11 8A D2 55 2F D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 8A D2 55 D2 54 D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 51 54 8A D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 8A D2 8A D2 8A D2 56 D2 54 D2 56 D2 8A D2 51 54 8A D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 51 54 8A D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 54 D2 55 D2 56 D3 55 D2 8A D2 51 54 2F 8A D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 2E 8A D2 54 D2 55 2F D2 8A D2 2E 8A D2 56 2F D2 55 D2 2E 8A D2 2F 8A D2 54 D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 2E 8A D2 54 D2 55 2F D2 8A D2 2E 8A D2 56 2F D2 55 D2 2E 8A D2 2F 8A D2 54 D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 2E 8A D2 54 2F D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 2E 8A D2 2F 8A D2 54 D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 8A D2 54 2E D2 55 2F D2 8A D2 2E 8A D2 56 2F D2 55 2E D2 8A D2 2F 8A D2 51 54 2F 8A D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 8A D2 54 2E D2 55 2F D2 8A D2 2E 8A D2 56 2F D2 55 D2 2E 8A D2 2F 8A D2 54 D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 2E 8A D2 54 D2 55 2F D2 8A D2 2E 8A D2 56 2F D2 55 D2 2E 8A D2 2F 8A D2 54 D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 8A D2 54 2E D2 55 2F D2 8A D2 2E 8A D2 56 2F D2 55 D2 2E 8A D2 2F 8A D2 54 D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 8A D2 54 2E D2 55 2F D2 8A D2 2E 8A D2 56 2F D2 55 D2 2E 8A D2 2F 8A D2 51 54 2F 8A D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 8A D2 54 2E D2 55 2F D2 8A D2 2E 8A D2 56 2F D2 55 D2 2E 8A D2 2F 8A D2 54 D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 8A D2 54 2E D2 55 2F D2 8A D2 2E 8A D2 56 2F D2 55 D2 2E 8A D2 2F 8A D2 54 D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 2E 8A D2 54 2F D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 2E 8A D2 54 2F D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 8A D2 56 2E D2 2F 8A D2 8A D2 55 2E D2 56 2F D2 55 D2 56 2E D2 2F 8A D2 51 54 8A D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 8A D2 54 2E D2 55 2F D2 8A D2 2E 8A D2 56 2F D2 55 D2 2E 8A D2 2F 8A D2 54 D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 8A D2 54 2E D2 55 2F D2 8A D2 2E 8A D2 56 2F D2 55 D2 2E 8A D2 2F 8A D2 54 D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 2E 8A D2 54 2F D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 2E 8A D2 54 2F D2 55 2E D2 2F 8A D2 8A D2 56 2E D2 55 2F D2 8A D2 8A D2 54 2E D2 55 2F D2 8A D2 2E 8A D2 56 2F D2 55 D2 2E 8A D2 2F 8A D2 51 54 01 8A FF E1 05 D3 51 2F D3 11 D2 51 53 1C 93 D2 18 D2 14 D2 11 EA 12 D2 14 D2 18 D2 1C D2 91 D2 18 D2 14 D2 11 EA 12 D2 14 D2 18 D2 1C D2 51 53 1C 8F D2 18 D2 14 D2 11 EA 12 D2 14 D2 18 D2 1C D2 8E D2 18 D2 14 D2 12 EA 12 D2 14 D2 18 D2 1C D2 51 54 11 8A D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 8A D2 55 D2 54 D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 8A D2 8A D2 8A D2 56 D2 54 D2 56 D2 8A D2 51 54 8A D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 8A D2 55 D2 54 D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 55 D2 8A D2 8A D2 56 D3 55 D2 8A D2 54 D2 8A D2 8A D2 8A D2 56 D2 54 D2 56 D2 8A D2 51 53 1E 93 D2 1C D2 18 D2 14 D2 12 D2 11 FF DA 12 D2 14 D2 18 D2 1C D2 51 53 18 A4 EF 19 D2 1A D2 18 A7 D2 14 D2 11 D7 A6 D7 12 D2 13 D2 11 A7 D2 12 D2 13 D2 14 D2 15 D2 16 D2 17 D2 18 D2 19 D7 1A D2 1C D2 51 59 9A FF E3 51 FF E3 51 53 11 9F E1 9D E1 A0 D9 9A D9 9F E1 51 53 AB DD A7 D5 A9 E1 AB D3 A9 D3 A7 DD A2 D9 A4 D5 A6 D5 51 53 A4 DD A0 D5 A2 E1 A4 D9 A6 D9 A7 E1 51 53 A4 DD A0 D5 A2 E1 98 D9 96 D9 9B E1 51 13 D2 15 D2 17 D2 19 D2 1B D2 1D D2 50 D2 11 FF DC 51 53 1C 9F D2 18 D2 14 D2 11 D3 12 D3 13 D3 14 D3 15 D3 16 D3 17 D3 18 D3 19 D3 1A D3 1B D3 1C D3 1D D3 1E D3 1F D2 1C 9D D2 18 D2 14 D2 11 D3 12 D3 13 D3 14 D3 15 D3 16 D3 17 D3 18 D3 19 D3 1A D3 1B D3 1C D3 1D D3 1E D3 1F D2 51 53 1C 9B D2 18 D2 14 D2 11 D3 12 D3 13 D3 14 D3 15 D3 16 D3 17 D3 18 D3 19 D3 1A D3 1B D3 1C D3 1D D3 1E D3 1F D2 1C 9A D2 18 D2 14 D2 11 D3 12 D3 13 D3 14 D3 15 D3 16 D3 17 D3 18 D3 19 D3 1A D3 1B D3 1C D3 1D D3 1E D3 1F D2 51 59 11 9A FF E3 51 53 1E 9F D2 1C D2 18 D2 14 D2 12 D2 11 D6 12 D5 13 D5 14 D5 15 D5 16 D5 17 D5 18 D5 19 D5 1A D5 1B D5 1C D5 1D D5 1E D5 1F D3 51 53 18 A7 EF 19 D2 1A D2 18 AB D2 14 D2 11 D7 A9 D7 12 D2 13 D2 11 AB D2 12 D2 13 D2 14 D2 15 D2 16 D2 17 D2 18 D2 19 D7 1A D2 1C D2 51 2E D3 11 D2 51 D3 52 2E 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D3 51 D3 52 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D3 51 D3 52 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 8E D5 93 D3 51 D3 52 93 D5 93 D5 93 D5 93 D5 93 D5 93 D5 93 D5 93 D5 93 D5 93 D5 93 D5 93 D5 93 D5 93 D5 93 D5 93 D3 51 D5 52 8E D9 8E D9 8E D9 8E F4 05 D2 51 D3 58 11 8C D3 8C D3 8E D3 8F D5 8E D3 8C D3 8E D5 8A DB 8E D3 8F D5 8E D3 8C D3 8E D5 8A D3 8E D3 8C E1 51 D3 58 8C D3 8C D3 8E D3 8F D3 91 D3 93 D3 8F D3 91 D5 8E D9 8F D3 91 D3 93 D5 91 D3 8F D3 91 D5 8E D3 8A D3 8C DD 8F D3 91 D3 51 58 93 D7 93 D3 93 D3 94 D3 93 D3 8F D3 91 D5 8E DD 8F D7 8F D3 8F D3 91 D3 8F D3 8C D3 8E D5 87 DD 51 58 88 D7 8A D3 8C D3 8A D3 88 D3 8C D3 8A D5 8F D9 8F D3 91 D3 8F D5 8E D3 8C D3 8E D5 8A D3 8E D3 8C DD 8F D3 91 D3 51 58 8F D5 8E D3 8C D3 8E D5 8A D3 8E D3 8C DD 8F D3 91 D3 8F D5 8E D3 8C D3 8E D5 8A D3 8E D3 8C E1 51 58 93 D3 91 D3 8F D3 91 D3 93 D3 8F D3 93 D3 94 D3 91 D3 8F D3 8E D3 8F D3 91 D3 8A D3 91 D5 93 D3 91 D3 8F D3 91 D3 93 D3 91 D3 8F D3 8C D3 8E D3 8F D3 8E D3 8B D3 87 D9 51 58 8F D5 8E D5 8C D3 8E D3 8F D3 91 D3 93 D5 8F D9 93 D3 94 D3 91 D5 8F D3 8E D3 8F D5 8E D3 8A D3 8C DD 93 D3 94 D3 51 58 91 D5 8F D3 8E D3 8F D5 8E D3 8A D3 8C DD 93 D3 94 D3 91 D5 8F D3 8E D3 8F D5 91 D3 8E D3 8C E1 51 53 A7 E1 A6 E1 A4 D9 A3 D9 A4 E1 51 53 A2 F1 9F DD 9B D5 9A E1 51 53 9B F1 9B D9 9F E9 51 53 9B F1 9B D9 9A D9 9F E1 51 2F FF E3 51 57 26 9F D3 AB D3 9F D3 AB D3 9F D3 AB D3 9F D3 AB D3 9F D3 AB D3 9F D3 AB D3 9F D3 AB D3 9F D3 AB D3 9D D3 A9 D3 9D D3 A9 D3 9D D3 A9 D3 9D D3 A9 D3 9D D3 A9 D3 9D D3 A9 D3 9D D3 A9 D3 9D D3 A9 D3 51 57 26 9B D3 A7 D3 9B D3 A7 D3 9B D3 A7 D3 9B D3 A7 D3 9B D3 A7 D3 9B D3 A7 D3 9B D3 A7 D3 9B D3 A7 D3 9A D3 A6 D3 9A D3 A6 D3 9A D3 A6 D3 9A D3 A6 D3 9A D3 A6 D3 9A D3 A6 D3 9A D3 A6 D3 9A D3 A6 D3 51 57 26 A4 D3 B0 D3 A4 D3 B0 D3 A4 D3 B0 D3 A4 D3 B0 D3 A4 D3 B0 D3 A4 D3 B0 D3 A4 D3 B0 D3 A4 D3 B0 D3 A2 D3 AE D3 A2 D3 AE D3 A2 D3 AE D3 A2 D3 AE D3 A2 D3 AE D3 A2 D3 AE D3 A2 D3 AE D3 A2 D3 AE D3 51 57 26 A0 D3 AC D3 A0 D3 AC D3 A0 D3 AC D3 A0 D3 AC D3 A0 D3 AC D3 A0 D3 AC D3 A0 D3 AC D3 A0 D3 AC D3 9F D3 AB D3 9F D3 AB D3 9F D3 AB D3 9F D3 AB D3 9F D3 AB D3 9F D3 AB D3 9F D3 AB D3 9F D3 AB D3 51 57 26 AC D3 A0 D3 A2 D3 A4 D5 A0 D3 A2 D3 A4 D3 AC D3 A0 D3 A2 D3 A4 D5 A0 D3 A2 D3 A4 D3 B0 D3 A4 D3 A7 D3 A4 D3 A6 D5 A7 D3 A4 DF A2 D5 51 57 2E A4 D2 2F A4 D2 2E A4 D2 11 A4 D2 2F B0 D2 2E B0 D2 A4 D2 2F A4 D2 B0 D2 2E B0 D2 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 A2 D2 2F A2 D2 2E A2 D2 A2 D2 2F AE D2 2E AE D2 A2 D2 2F A2 D2 AE D2 2E AE D2 A2 D2 2F A2 D2 2E A2 D2 A2 D2 2F AE D2 2E AE D2 A0 D2 2E A0 D2 2E A0 D2 A0 D2 2F AC D2 2E AC D2 A0 D2 2F AC D2 2E 9F D2 2F 9F D2 2E 9F D2 9F D2 2F AB D2 2E 9F D2 2F A2 D2 2E A2 D2 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 2F A4 D2 2E AB D2 2F B7 D2 B0 D2 2E B0 D2 51 57 26 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 2F A4 D2 B0 D2 2E B0 D2 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 A2 D2 2F A2 D2 2E A2 D2 A2 D2 2F AE D2 2E AE D2 A2 D2 2F A2 D2 AE D2 2E AE D2 A2 D2 2F A2 D2 2E A2 D2 A2 D2 2F AE D2 2E AE D2 A0 D2 2E A0 D2 2E A0 D2 A0 D2 2F AC D2 2E AC D2 A0 D2 2F AC D2 2E 9F D2 2F 9F D2 2E 9F D2 9F D2 2F AB D2 2E 9F D2 2F A2 D2 2E A2 D2 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 2F A4 D2 2E AB D2 2F B7 D2 B0 D2 2E B0 D2 51 57 26 A7 D2 2F A7 D2 2E A7 D2 A7 D2 2F B3 D2 2E B3 D2 A7 D2 A7 D2 2F B3 D2 2E B3 D2 A7 D2 2F A7 D2 2E A7 D2 A7 D2 2F B3 D2 2E B3 D2 A2 D2 2F A2 D2 2E A2 D2 A2 D2 2F AE D2 2E AE D2 A2 D2 2F A2 D2 AE D2 2E AE D2 A2 D2 2F A2 D2 2E A2 D2 A2 D2 2F AE D2 2E AE D2 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 9F D2 2F 9F D2 2E 9F D2 9F D2 2F AB D2 2E AB D2 9F D2 9F D2 2F AB D2 2E AB D2 9F D2 2F 9F D2 2E 9F D2 9F D2 2F AB D2 2E AB D2 51 57 26 A0 D2 2F A0 D2 2E A0 D2 A0 D2 2F AC D2 2E AC D2 A0 D2 A0 D2 2F AC D2 2E AC D2 A0 D2 2F A0 D2 2E A0 D2 A0 D2 2F AC D2 2E AC D2 A7 D2 2F A7 D2 2E A7 D2 A7 D2 2F B3 D2 2E B3 D2 A7 D2 A7 D2 2F B3 D2 2E B3 D2 A7 D2 2F A7 D2 2E A7 D2 A7 D2 2F B3 D2 2E B3 D2 A0 D2 2F A0 D2 2E A0 D2 A0 D2 2F AC D2 2E AC D2 A0 D2 2F A0 D2 2E 9F D2 2F 9F D2 2E 9F D2 9F D2 2F AB D2 2E AB D2 A2 D2 2F AE D2 2E A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 51 57 26 A0 D2 2F A0 D2 2E A0 D2 A0 D2 2F AC D2 2E AC D2 A0 D2 A0 D2 9F D2 2F 9F D2 2E 9F D2 9F D2 2F AB D2 2E AB D2 A2 D2 2F AE D2 2E A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 A0 D2 2F A0 D2 2E A0 D2 A0 D2 2F AC D2 2E AC D2 A0 D2 2F A0 D2 2E 9F D2 2F 9F D2 2E 9F D2 9F D2 2F AB D2 2E AB D2 A2 D2 2F AE D2 2E A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 51 57 26 A7 D2 2F A7 D2 2E A7 D2 A7 D2 2F B3 D2 2E B3 D2 A7 D2 A7 D2 2F B3 D2 2E B3 D2 A7 D2 2F A7 D2 2E A7 D2 A7 D2 2F B3 D2 2E B3 D2 2E A2 D2 2F A2 D2 2E A2 D2 A2 D2 2F AE D2 2E AE D2 A2 D2 2F A2 D2 AE D2 2E AE D2 A2 D2 2F A2 D2 2E A2 D2 A2 D2 2F AE D2 2E AE D2 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 9F D2 2F 9F D2 2E 9F D2 9F D2 2F AB D2 2E AB D2 9F D2 9F D2 2F AB D2 2E AB D2 9F D2 2F 9F D2 2E 9F D2 9F D2 2F AB D2 2E AB D2 51 57 26 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 2F A4 D2 B0 D2 2E B0 D2 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 A2 D2 2F A2 D2 2E A2 D2 A2 D2 2F AE D2 2E AE D2 A2 D2 2F A2 D2 AE D2 2E AE D2 A2 D2 2F A2 D2 2E A2 D2 A2 D2 2F AE D2 2E AE D2 A0 D2 2F A0 D2 2E A0 D2 A0 D2 2F AC D2 2E AC D2 A0 D2 2F AC D2 2E 9F D2 2F 9F D2 2E 9F D2 9F D2 2F AB D2 2E AB D2 2F A2 D2 2E AE D2 A4 D2 2F A4 D2 2E A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 A4 D2 2F B0 D2 2E B0 D2 A4 D2 2F A4 D2 2E AB D2 2F B7 D2 B0 D2 2E B0 D2 51 05 FF E3 51 57 2F 7B D3 87 D3 7B D3 87 D3 7B D3 87 D3 7B D3 87 D3 7B D3 87 D3 7B D3 87 D3 7B D3 87 D3 7B D3 87 D3 79 D3 85 D3 79 D3 85 D3 79 D3 85 D3 79 D3 85 D3 79 D3 85 D3 79 D3 85 D3 79 D3 85 D3 79 D3 85 D3 51 57 77 D3 83 D3 77 D3 83 D3 77 D3 83 D3 77 D3 83 D3 77 D3 83 D3 77 D3 83 D3 77 D3 83 D3 77 D3 83 D3 76 D3 82 D3 76 D3 82 D3 76 D3 82 D3 76 D3 82 D3 76 D3 82 D3 76 D3 82 D3 76 D3 82 D3 76 D3 82 D3 51 57 80 D3 8C D3 80 D3 8C D3 80 D3 8C D3 80 D3 8C D3 80 D3 8C D3 80 D3 8C D3 80 D3 8C D3 80 D3 8C D3 7E D3 8A D3 7E D3 8A D3 7E D3 8A D3 7E D3 8A D3 7E D3 8A D3 7E D3 8A D3 7E D3 8A D3 7E D3 8A D3 51 57 7C D3 88 D3 7C D3 88 D3 7C D3 88 D3 7C D3 88 D3 7C D3 88 D3 7C D3 88 D3 7C D3 88 D3 7C D3 88 D3 7B D3 87 D3 7B D3 87 D3 7B D3 87 D3 7B D3 87 D3 7B D3 87 D3 7B D3 87 D3 7B D3 87 D3 7B D3 87 D3 51 57 05 88 D3 7C D3 7E D3 80 D5 7C D3 7E D3 80 D3 88 D3 7C D3 7E D3 80 D5 7C D3 7E D3 80 D3 8C D3 80 D3 83 D3 80 D3 82 D5 83 D3 80 DF 7E D5 51 57 2E 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 2F 80 D2 8C D2 2E 8C D2 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 7E D2 2F 7E D2 2E 7E D2 7E D2 2F 8A D2 2E 8A D2 7E D2 2F 7E D2 8A D2 2E 8A D2 7E D2 2F 7E D2 2E 7E D2 7E D2 2F 8A D2 2E 8A D2 7C D2 2E 7C D2 2E 7C D2 7C D2 2F 88 D2 2E 88 D2 7C D2 2F 88 D2 2E 7B D2 2F 7B D2 2E 7B D2 7B D2 2F 87 D2 2E 7B D2 2F 7E D2 2E 7E D2 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 2F 80 D2 2E 87 D2 2F 93 D2 8C D2 2E 8C D2 51 57 2E 83 D2 2F 83 D2 2E 83 D2 83 D2 2F 8F D2 2E 8F D2 83 D2 83 D2 2F 8F D2 2E 8F D2 83 D2 2F 83 D2 2E 83 D2 83 D2 2F 8F D2 2E 8F D2 7E D2 2F 7E D2 2E 7E D2 7E D2 2F 8A D2 2E 8A D2 7E D2 2F 7E D2 8A D2 2E 8A D2 7E D2 2F 7E D2 2E 7E D2 7E D2 2F 8A D2 2E 8A D2 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 7B D2 2F 7B D2 2E 7B D2 7B D2 2F 87 D2 2E 87 D2 7B D2 7B D2 2F 87 D2 2E 87 D2 7B D2 2F 7B D2 2E 7B D2 7B D2 2F 87 D2 2E 87 D2 51 57 2E 7C D2 2F 7C D2 2E 7C D2 7C D2 2F 88 D2 2E 88 D2 7C D2 7C D2 2F 88 D2 2E 88 D2 7C D2 2F 7C D2 2E 7C D2 7C D2 2F 88 D2 2E 88 D2 83 D2 2F 83 D2 2E 83 D2 83 D2 2F 8F D2 2E 8F D2 83 D2 83 D2 2F 8F D2 2E 8F D2 83 D2 2F 83 D2 2E 83 D2 83 D2 2F 8F D2 2E 8F D2 7C D2 2F 7C D2 2E 7C D2 7C D2 2F 88 D2 2E 88 D2 7C D2 2F 7C D2 2E 7B D2 2F 7B D2 2E 7B D2 7B D2 2F 87 D2 2E 87 D2 7E D2 2F 8A D2 2E 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 51 57 2E 7C D2 2F 7C D2 2E 7C D2 7C D2 2F 88 D2 2E 88 D2 7C D2 7C D2 7B D2 2F 7B D2 2E 7B D2 7B D2 2F 87 D2 2E 87 D2 7E D2 2F 8A D2 2E 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 7C D2 2F 7C D2 2E 7C D2 7C D2 2F 88 D2 2E 88 D2 7C D2 2F 7C D2 2E 7B D2 2F 7B D2 2E 7B D2 7B D2 2F 87 D2 2E 87 D2 7E D2 2F 8A D2 2E 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 51 57 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 2F 80 D2 8C D2 2E 8C D2 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 7E D2 2F 7E D2 2E 7E D2 7E D2 2F 8A D2 2E 8A D2 7E D2 2F 7E D2 8A D2 2E 8A D2 7E D2 2F 7E D2 2E 7E D2 7E D2 2F 8A D2 2E 8A D2 7C D2 2F 7C D2 2E 7C D2 7C D2 2F 88 D2 2E 88 D2 7C D2 2F 88 D2 2E 7B D2 2F 7B D2 2E 7B D2 7B D2 2F 87 D2 2E 87 D2 2F 7E D2 2E 8A D2 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 2F 80 D2 2E 87 D2 2F 93 D2 8C D2 2E 8C D2 51 57 83 D2 2F 83 D2 2E 83 D2 83 D2 2F 8F D2 2E 8F D2 83 D2 83 D2 2F 8F D2 2E 8F D2 83 D2 2F 83 D2 2E 83 D2 83 D2 2F 8F D2 2E 8F D2 7E D2 2F 7E D2 2E 7E D2 7E D2 2F 8A D2 2E 8A D2 7E D2 2F 7E D2 8A D2 2E 8A D2 7E D2 2F 7E D2 2E 7E D2 7E D2 2F 8A D2 2E 8A D2 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 7B D2 2F 7B D2 2E 7B D2 7B D2 2F 87 D2 2E 87 D2 7B D2 7B D2 2F 87 D2 2E 87 D2 7B D2 2F 7B D2 2E 7B D2 7B D2 2F 87 D2 2E 87 D2 51 57 7C D2 2F 7C D2 2E 7C D2 7C D2 2F 88 D2 2E 88 D2 7C D2 7C D2 2F 88 D2 2E 88 D2 7C D2 2F 7C D2 2E 7C D2 7C D2 2F 88 D2 2E 88 D2 83 D2 2F 83 D2 2E 83 D2 83 D2 2F 8F D2 2E 8F D2 83 D2 83 D2 2F 8F D2 2E 8F D2 83 D2 2F 83 D2 2E 83 D2 83 D2 2F 8F D2 2E 8F D2 7C D2 2F 7C D2 2E 7C D2 7C D2 2F 88 D2 2E 88 D2 7C D2 2F 7C D2 2E 7B D2 2F 7B D2 2E 7B D2 7B D2 2F 87 D2 2E 87 D2 7E D2 2F 8A D2 2E 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 80 D2 2F 8C D2 2E 8C D2 80 D2 2F 80 D2 2E 80 D2 80 D2 2F 8C D2 2E 8C D2 51 13 00 0C 13 02 0B 13 03 0A 13 02 0A 13 00 09 13 01 09 13 02 08 13 03 08 13 06 07 13 03 07 13 00 06 13 03 06 13 06 05 13 03 05 0C 13 00 04 04 03 03 02 02 01 01 FC FE 11 00 10 10 0F 11 02 11 03 11 02 11 00 1F FE 1F FD 1F FE 11 00 11 04 11 06 11 04 11 00 1F FC 1F FA 1F FC FC 11 00 0F 1F 80 0C 1F 00 09 1D 80 06 1D 00 04 1B E0 02 FC 00 21 00 08 05 61 00 03 00 21 00 02 01 11 00 00 FC 73 00 0F 71 D0 0C 71 A0 09 71 80 07 71 60 05 71 40 03 71 30 01 FC 44 01 00 BF AE AE 9D 9D 8C 8C 7B 7B 6A 6A 59 59 48 48 47 47 11 36 35 25 25 11 14 11 03 11 02 10 04 01 FC A1 00 0E 2E 11 00 0D 0D 0C 0B 0B 0A 0A 09 08 08 07 07 06 06 05 04 04 03 03 02 02 01 01 00 00 FC 11 00 00 FC 41 16 77 16 9C 16 AF 16 C0 16 D6 16 F9 16 19 17 10 11 03 00 61 00 FE 03 06 09 0C 0F 12 15 18 18 1B 1E 21 24 27 1B 1E 2A 2D 30 33 33 36 39 39 3C 3F FF 1E 00 8D 05 8D 05 53 08 8D 05 8D 05 25 00 92 05 5D 07 58 08 59 0A 51 10 48 00 B5 05 A9 07 7C 08 0B 07 0B 07 6A 00 D8 05 F5 07 7C 08 5D 0A 55 10 48 00 4D 06 06 07 9F 08 A0 0A 98 10 8C 00 4D 06 0B 07 C2 08 E3 0A DA 10 AE 00 4D 06 0B 07 C2 08 26 0B 1C 11 D0 00 C1 06 FB 07 E5 08 0B 07 0B 07 DB 00 D9 06 26 08 0B 07 69 0B 5E 11 08 01 06 07 06 07 F2 08 98 0B 8D 11 7C 01 0B 07 0B 07 16 09 46 0C 8D 11 F0 01 0B 07 0B 07 41 09 F3 0C 3A 12 F0 01 0B 07 0B 07 63 09 9E 0D E5 12 F0 01 0B 07 0B 07 8B 09 4B 0E 92 13 F0 01 0B 07 0B 07 AD 09 F8 0E 3A 12 F0 01 0B 07 0B 07 E7 09 9E 0D E5 12 62 02 0B 07 0B 07 0F 0A 4B 0E 92 13 D4 02 0E 07 0B 07 31 0A A4 0F 3F 14 81 03 1B 07 0B 07 3D 0A F3 0C EB 14 2C 04 2F 07 0B 07 47 0A 9E 0D 95 15 D9 04 3D 07 0B 07 4F 0A 9E 0D 95 15 85 05 4B 07 0B 07 4B 07 0B 07 0B 07 35 13 .INCBIN   "Roger Hartley - Jobba.etc"   
+339F                             ;--------------------------------------------------------------------
+339F                             ; Ž¯¨á ­¨¥: à®¨£àë¢ îé¨© ¬®¤ã«ì ¬ã§ëª «ì­®£® à¥¤ ªâ®à  E-Tracker
+339F                             ; ¯®àâ¨à®¢ ­  á ª®¬¯ìîâ¥à  Sam Coupe
+339F                             ; €¢â®à ¯®àâ : ’ à á®¢ Œ..(Mick),2010
+339F                             ;--------------------------------------------------------------------
+339F                             ;-------------------------------------------------------------------
+339F                             ; ®¯¨á ­¨¥: ˆ­¨æ¨ «¨§ æ¨ï ¯à®¨£àë¢ â¥«ï
+339F                             ; ¯ à ¬¥âàë: ­¥â
+339F                             ; ¢®§¢à é ¥¬®¥  §­ ç¥­¨¥: ­¥â
+339F                             ;---------------------------------------------------------------------
+339F                EPLAYERINIT:      
+339F   21 00 00               LD   hl,0   ; ¤à¥á ¬ã;ëª¨
+33A2   C3 8B 37               JP   loc083EC   ;¯¥à¥å®¤ ­  ¨­¨æ¨ «¨; æ¨î ¯à®¨£àë¢ â¥«ï
+33A5                             ;-------------------------------------------------------------------
+33A5                             ; ®¯¨á ­¨¥: à®¨£àë¢ ­¨¥ â¥ªãé¥© ­®âë
+33A5                             ; ¯ à ¬¥âàë: ­¥â
+33A5                             ; ¢®§¢à é ¥¬®¥  §­ ç¥­¨¥: ­¥â
+33A5                             ;---------------------------------------------------------------------
+33A5                EPLAYERPLAY:      
+33A5   3E 01                  LD   a,1   ;â¥ªãé¨© ª ­ «
+33A7   3D                     DEC   a   
+33A8   20 1F                  JR   nz,loc0802A   ;¢ë¢¥«¨ ¨­ä®à¬ æ¨î ¢® ¢á¥ ª ­ «ë?
+33AA   DD 21 D9 36            LD   ix,word0833A   ;¤ ,¯¥à¥å®¤¨¬ ª ¯®¤£®â®¢ª¨ ­®¢ëå ;­ ç¥­¨©
+33AE   06 06                  LD   b,6   ;ç¨á«® ª ­ «®¢
+33B0                LOC08011:      
+33B0   C5                     PUSH   bc   
+33B1   CD 43 35               CALL   sub081A4   
+33B4   01 19 00               LD   bc,19h   ;ª®«¨ç¥áâ¢® ¡ ©â ¤«ï ®¤­®£® ª ­ « 
+33B7   DD 09                  ADD   ix,bc   
+33B9   C1                     POP   bc   
+33BA   10 F4                  DJNZ   loc08011   
+33BC   2A 89 37               LD   hl,(word083EA)   
+33BF   7C                     LD   a,h   
+33C0   CD F6 34               CALL   sub08157   
+33C3   B5                     OR   l   
+33C4   32 85 34               LD   (loc080E5+1),a   
+33C7                LOC08028:      
+33C7   3E 06                  LD   a,6   ;ãáâ ­®¢¨¬ â¥ªãé¨© ª ­ « ¤«ï ®¡­®¢«¥­¨ï
+33C9                LOC0802A:      
+33C9   32 A6 33               LD   (EPlayerPlay+1),a   ;ãáâ ­®¢¨¬ ­®¢®¥ ;­ ç¥­¨¥ â¥ªãé¥£® ª ­ « 
+33CC   DD 21 D9 36            LD   ix,word0833A   
+33D0   CD 09 36               CALL   sub0826A   
+33D3   32 6F 37               LD   (EAmplitudech0),a   ;Amplitude 0 right/left
+33D6   22 77 37               LD   (EFrequencych0),hl   
+33D9   E5                     PUSH   hl   
+33DA   21 00 00               LD   hl,0   
+33DD   CD FB 34               CALL   sub0815C   
+33E0   22 F5 33               LD   (loc08055+1),hl   
+33E3   32 83 34               LD   (loc080E3+1),a   
+33E6   DD 21 F2 36            LD   ix,word08353   
+33EA   CD 09 36               CALL   sub0826A   
+33ED   32 70 37               LD   (EAmplitudech1),a   ;Amplitude 1 right/left
+33F0   22 78 37               LD   (EFrequencych0+1),hl   
+33F3   E5                     PUSH   hl   
+33F4                LOC08055:      
+33F4   21 00 00               LD   hl,0   
+33F7   CD FB 34               CALL   sub0815C   
+33FA   22 13 34               LD   (loc08073+1),hl   
+33FD   CB 14                  RL   h   
+33FF   30 03                  JR   nc,loc08065   
+3401   32 83 34               LD   (loc080E3+1),a   
+3404                LOC08065:      
+3404   DD 21 0B 37            LD   ix,word0836C   
+3408   CD 09 36               CALL   sub0826A   
+340B   32 71 37               LD   (EAmplitudech2),a   ;Amplitude 2 right/left
+340E   22 79 37               LD   (EFrequencych2),hl   
+3411   E5                     PUSH   hl   
+3412                LOC08073:      
+3412   21 00 00               LD   hl,0   
+3415   CD FB 34               CALL   sub0815C   
+3418   22 31 34               LD   (loc08091+1),hl   
+341B   CB 14                  RL   h   
+341D   30 03                  JR   nc,loc08083   
+341F   32 83 34               LD   (loc080E3+1),a   
+3422                LOC08083:      
+3422   DD 21 24 37            LD   ix,word08385   
+3426   CD 09 36               CALL   sub0826A   
+3429   32 72 37               LD   (EAmplitudech3),a   ;Amplitude 3 right/left
+342C   22 7A 37               LD   (EFrequencych2+1),hl   
+342F   E5                     PUSH   hl   
+3430                LOC08091:      
+3430   21 00 00               LD   hl,0   
+3433   CD FB 34               CALL   sub0815C   
+3436   22 4B 34               LD   (loc080AB+1),hl   
+3439   32 7D 34               LD   (loc080DD+1),a   
+343C   DD 21 3D 37            LD   ix,word0839E   
+3440   CD 09 36               CALL   sub0826A   
+3443   32 73 37               LD   (EAmplitudech4),a   ;Amplitude 4 right/left
+3446   22 7B 37               LD   (EFrequencych4),hl   
+3449   E5                     PUSH   hl   
+344A                LOC080AB:      
+344A   21 00 00               LD   hl,0   
+344D   CD FB 34               CALL   sub0815C   
+3450   22 69 34               LD   (loc080C9+1),hl   
+3453   CB 14                  RL   h   
+3455   30 03                  JR   nc,loc080BB   
+3457   32 7D 34               LD   (loc080DD+1),a   
+345A                LOC080BB:      
+345A   DD 21 56 37            LD   ix,word083B7   
+345E   CD 09 36               CALL   sub0826A   
+3461   32 74 37               LD   (EAmplitudech5),a   ;Amplitude 5 right/left
+3464   22 7C 37               LD   (EFrequencych4+1),hl   
+3467   E5                     PUSH   hl   
+3468                LOC080C9:      
+3468   21 00 00               LD   hl,0   
+346B   CD FB 34               CALL   sub0815C   
+346E   CB 1D                  RR   l   
+3470   CB 1D                  RR   l   
+3472   CB 1C                  RR   h   
+3474   CB 1C                  RR   h   
+3476   22 83 37               LD   (EFrequencyen),hl   ;Freqency and Noise enable
+3479   07                     RLCA      
+347A   38 03                  JR   c,loc080E0   
+347C                LOC080DD:      
+347C   3E 00                  LD   a,0   
+347E   07                     RLCA      
+347F                LOC080E0:      
+347F   07                     RLCA      
+3480   07                     RLCA      
+3481   07                     RLCA      
+3482                LOC080E3:      
+3482   F6 00                  OR   0   
+3484                LOC080E5:      
+3484   F6 00                  OR   0   
+3486   32 85 37               LD   (ENoisegen),a   ;Noise generator 0 and 1
+3489   F1                     POP   af   
+348A   C1                     POP   bc   
+348B   CD F6 34               CALL   sub08157   
+348E   B0                     OR   b   
+348F   67                     LD   h,a   
+3490   F1                     POP   af   
+3491   C1                     POP   bc   
+3492   CD F6 34               CALL   sub08157   
+3495   B0                     OR   b   
+3496   6F                     LD   l,a   
+3497   22 80 37               LD   (EOctavech2),hl   ;Octave 2 and 3 and 4 and 5
+349A   F1                     POP   af   
+349B   C1                     POP   bc   
+349C   CD F6 34               CALL   sub08157   
+349F   B0                     OR   b   
+34A0   32 7F 37               LD   (EOctavech0),a   ;Octave 1 and 0
+34A3   01 43 00               LD   bc,SAAADDRPORT   
+34A6   11 01 1C               LD   de,1C01h   ;à¥£¨áâà 1‘h,¡¨â SE=1
+34A9   ED 51                  OUT   (c),d   
+34AB   0D                     DEC   c   
+34AC   ED 59                  OUT   (c),e   ;à ;à¥è¨âì ¢á¥ ª ­ «ë
+34AE   21 88 37               LD   hl,EEnvelopegen1   ;â ¡«¨æ  ¤ ­­ëå ;¢ãª®¢®£® ª ­ « 
+34B1   16 19                  LD   d,19h   ;à ;¬¥à ¤ ­­ëå ¤«ï ®¤­®£® ª ­ « 
+34B3                LOC08114:      
+34B3   0C                     INC   c   
+34B4   ED 51                  OUT   (c),d   ; £àã¦ ¥¬ ­®¬¥à à¥£¨áâà 
+34B6   0D                     DEC   c   
+34B7   7E                     LD   a,(hl)   ;ç¨â ¥¬ ;­ ç¥­¨¥ ¨; â ¡«¨æë
+34B8   ED 79                  OUT   (c),a   ;¢ë¢®¤¨¬ ¢ ¯®àâ
+34BA   15                     DEC   d   ;á«¥¤ãîé¨© ¡ ©â
+34BB   F8                     RET   m   ;¢ëå®¤ ¯® ®ª®­ç ­¨¨ ; ¯¨á¨
+34BC   2B                     DEC   hl   ;¯¥à¥å®¤¨¬ ª á«¥¤ãîé¨¬ ;­ ç¥­¨ï¬
+34BD   18 F4                  JR   loc08114   ;¯à®¤®«¦¨¬ ; ¯¨áì ¢ ¯®àâ
+34BF   05                     DB   5   
+34C0   21                     DB   21h   
+34C1   3C                     DB   3Ch   
+34C2   55                     DB   55h   
+34C3   6D                     DB   6Dh   
+34C4   84                     DB   84h   
+34C5   99                     DB   99h   
+34C6   AD                     DB   0ADh   
+34C7   C0                     DB   0C0h   
+34C8   D2                     DB   0D2h   
+34C9   E3                     DB   0E3h   
+34CA   F3                     DB   0F3h   
+34CB   FE           UNK0812C:   DB   0FEh   
+34CC   01                     DB   1   
+34CD   00                     DB   0   
+34CE   00                     DB   0   
+34CF   FC                     DB   0FCh   
+34D0   00           UNK08131:   DB   0   
+34D1   96                     DB   96h   
+34D2   9E                     DB   9Eh   
+34D3   9A                     DB   9Ah   
+34D4   86                     DB   86h   
+34D5   8E                     DB   8Eh   
+34D6   8A                     DB   8Ah   
+34D7   97                     DB   97h   
+34D8   9F                     DB   9Fh   
+34D9   9B                     DB   9Bh   
+34DA   87                     DB   87h   
+34DB   8F                     DB   8Fh   
+34DC   8B                     DB   8Bh   
+34DD   FE           UNK0813E:   DB   0FEh   
+34DE   00                     DB   0   
+34DF   FF           UNK08140:   DB   0FFh   
+34E0   D2                     DB   0D2h   
+34E1   57                     DB   57h   
+34E2   72                     DB   72h   
+34E3   00                     DB   0   
+34E4   52                     DB   52h   
+34E5   AB                     DB   0ABh   
+34E6   51                     DB   51h   
+34E7   61                     DB   61h   
+34E8   50                     DB   50h   
+34E9   52                     DB   52h   
+34EA   30                     DB   30h   
+34EB   C2                     DB   0C2h   
+34EC   2E                     DB   2Eh   
+34ED   35                     DB   35h   
+34EE   21                     DB   21h   
+34EF   29                     DB   29h   
+34F0   11                     DB   11h   
+34F1   41                     DB   41h   
+34F2   0F                     DB   0Fh   
+34F3   46                     DB   46h   
+34F4   00                     DB   0   
+34F5   3A                     DB   3Ah   
+34F6                SUB08157:      
+34F6   07                     RLCA      
+34F7   07                     RLCA      
+34F8   07                     RLCA      
+34F9   07                     RLCA      
+34FA   C9                     RET      
+34FB                SUB0815C:      
+34FB   08                     EX   af,af'   
+34FC   0F                     RRCA      
+34FD   CB 1D                  RR   l   
+34FF   0F                     RRCA      
+3500   CB 1C                  RR   h   
+3502   C9                     RET      
+3503                SUB08164:      
+3503   CB 21                  SLA   c   
+3505   06 00                  LD   b,0   
+3507   09                     ADD   hl,bc   
+3508                SUB08169:      
+3508   4E                     LD   c,(hl)   ;ç¨â ¥¬  ¬« ¤è¨© ¡ ©â  ¤à¥á  á¬¥é¥­¨ï
+3509   23                     INC   hl   
+350A   46                     LD   b,(hl)   ;ç¨â ¥¬ áâ àè¨© ¡ ©â  ¤à¥á  á¬¥é¥­¨ï
+350B   23                     INC   hl   ;¯¥à¥å®¤¨¬ ª á«¥¤ãîé¥¬ã  ¤à¥áã
+350C   E5                     PUSH   hl   
+350D                LOC0816E:      
+350D   21 00 00               LD   hl,0   ; ¤à¥á ¬ã;ëª¨
+3510   09                     ADD   hl,bc   ;¯®«ãç¨¬  ¤à¥á â ¡«¨æë
+3511   4D                     LD   c,l   ;¬« ¤è¨© ¡ ©â  ¤à¥á 
+3512   44                     LD   b,h   ;áâ àè¨© ¡ ©â  ¤à¥á 
+3513   E1                     POP   hl   
+3514   C9                     RET      
+3515                LOC08176:      
+3515   21 00 00               LD   hl,0   
+3518   CD 03 35               CALL   sub08164   
+351B   DD 71 0F               LD   (ix+0Fh),c   
+351E   DD 70 10               LD   (ix+10h),b   
+3521   21 CB 34               LD   hl,unk0812C   
+3524   DD 75 04               LD   (ix+4),l   
+3527   DD 74 05               LD   (ix+5),h   
+352A   18 47                  JR   loc081D4   
+352C                LOC0818D:      
+352C   21 00 00               LD   hl,0   
+352F   CD 03 35               CALL   sub08164   
+3532   DD 71 11               LD   (ix+11h),c   
+3535   DD 70 12               LD   (ix+12h),b   
+3538   21 DD 34               LD   hl,unk0813E   
+353B   DD 75 08               LD   (ix+8),l   
+353E   DD 74 09               LD   (ix+9),h   
+3541   18 3C                  JR   loc081E0   
+3543                SUB081A4:      
+3543   DD 35 13               DEC   (ix+13h)   
+3546   F0                     RET   p   
+3547   78                     LD   a,b   
+3548   FE 03                  CP   3   
+354A   21 87 37               LD   hl,EEnvelopegen0   
+354D   30 01                  JR   nc,loc081B1   
+354F   23                     INC   hl   
+3550                LOC081B1:      
+3550   22 9B 35               LD   (loc081FB+1),hl   
+3553                LOC081B4:      
+3553   DD 5E 00               LD   e,(ix+0)   
+3556   DD 56 01               LD   d,(ix+1)   
+3559                LOC081BA:      
+3559   21 DF 34               LD   hl,unk08140   
+355C                LOC081BD:      
+355C   1A                     LD   a,(de)   
+355D   23                     INC   hl   
+355E   96                     SUB   (hl)   
+355F   23                     INC   hl   
+3560   38 FA                  JR   c,loc081BD   
+3562   13                     INC   de   
+3563   4F                     LD   c,a   
+3564   7E                     LD   a,(hl)   
+3565   32 69 35               LD   (loc081C9+1),a   
+3568                LOC081C9:      
+3568   18 FE                  JR   loc081C9   
+356A                LOC081CB:      
+356A   DD 71 0E               LD   (ix+0Eh),c   
+356D   DD 4E 0F               LD   c,(ix+0Fh)   
+3570   DD 46 10               LD   b,(ix+10h)   
+3573                LOC081D4:      
+3573   DD 71 02               LD   (ix+2),c   
+3576   DD 70 03               LD   (ix+3),b   
+3579   DD 4E 11               LD   c,(ix+11h)   
+357C   DD 46 12               LD   b,(ix+12h)   
+357F                LOC081E0:      
+357F   DD 71 06               LD   (ix+6),c   
+3582   DD 70 07               LD   (ix+7),b   
+3585   DD 36 14 01            LD   (ix+14h),1   
+3589   DD 36 15 01            LD   (ix+15h),1   
+358D   DD 36 16 01            LD   (ix+16h),1   
+3591   18 C6                  JR   loc081BA   
+3593                LOC081F4:      
+3593   06 00                  LD   b,0   
+3595   21 D0 34               LD   hl,unk08131   
+3598   09                     ADD   hl,bc   
+3599   7E                     LD   a,(hl)   
+359A                LOC081FB:      
+359A   32 00 00               LD   (0),a   
+359D   18 BA                  JR   loc081BA   
+359F                LOC08200:      
+359F   DD 71 17               LD   (ix+17h),c   
+35A2   18 B5                  JR   loc081BA   
+35A4                LOC08205:      
+35A4   79                     LD   a,c   
+35A5   3C                     INC   a   
+35A6   32 C8 33               LD   (loc08028+1),a   
+35A9   18 AE                  JR   loc081BA   
+35AB                LOC0820C:      
+35AB   DD 71 18               LD   (ix+18h),c   
+35AE   18 A9                  JR   loc081BA   
+35B0                LOC08211:      
+35B0   28 02                  JR   z,loc08215   
+35B2   0E 03                  LD   c,3   
+35B4                LOC08215:      
+35B4   2A 9B 35               LD   hl,(loc081FB+1)   
+35B7   23                     INC   hl   
+35B8   23                     INC   hl   
+35B9   71                     LD   (hl),c   
+35BA   18 9D                  JR   loc081BA   
+35BC                LOC0821D:      
+35BC   01 CB 34               LD   bc,unk0812C   
+35BF   18 B2                  JR   loc081D4   
+35C1                LOC08222:      
+35C1   DD 71 13               LD   (ix+13h),c   
+35C4   DD 73 00               LD   (ix+0),e   
+35C7   DD 72 01               LD   (ix+1),d   
+35CA   C9                     RET      
+35CB                LOC0822C:      
+35CB   CD 00 38               CALL   sub08461   
+35CE   C3 53 35               JP   loc081B4   
+35D1                LOC08232:      
+35D1   FE 7F                  CP   7Fh   ; ""
+35D3   28 09                  JR   z,loc0823F   
+35D5   FE 7E                  CP   7Eh   ; "~"
+35D7   28 0D                  JR   z,loc08247   
+35D9   C6 02                  ADD   a,2   
+35DB   4F                     LD   c,a   
+35DC   18 3E                  JR   loc0827D   
+35DE                LOC0823F:      
+35DE   DD 75 04               LD   (ix+4),l   
+35E1   DD 74 05               LD   (ix+5),h   
+35E4   18 36                  JR   loc0827D   
+35E6                LOC08247:      
+35E6   DD 6E 04               LD   l,(ix+4)   
+35E9   DD 66 05               LD   h,(ix+5)   
+35EC   18 2E                  JR   loc0827D   
+35EE                LOC0824F:      
+35EE   3C                     INC   a   
+35EF   28 08                  JR   z,loc0825A   
+35F1   3C                     INC   a   
+35F2   28 0D                  JR   z,loc08262   
+35F4   D6 60                  SUB   60h   ; "`"
+35F6   4F                     LD   c,a   
+35F7   18 45                  JR   loc0829F   
+35F9                LOC0825A:      
+35F9   DD 6E 08               LD   l,(ix+8)   
+35FC   DD 66 09               LD   h,(ix+9)   
+35FF   18 3D                  JR   loc0829F   
+3601                LOC08262:      
+3601   DD 75 08               LD   (ix+8),l   
+3604   DD 74 09               LD   (ix+9),h   
+3607   18 35                  JR   loc0829F   
+3609                SUB0826A:      
+3609   DD 5E 0A               LD   e,(ix+0Ah)   
+360C   DD 56 0B               LD   d,(ix+0Bh)   
+360F   DD 35 15               DEC   (ix+15h)   
+3612   DD 6E 02               LD   l,(ix+2)   
+3615   DD 66 03               LD   h,(ix+3)   
+3618   20 13                  JR   nz,loc0828E   
+361A   0E 01                  LD   c,1   
+361C                LOC0827D:      
+361C   7E                     LD   a,(hl)   
+361D   23                     INC   hl   
+361E   0F                     RRCA      
+361F   30 B0                  JR   nc,loc08232   
+3621   DD 71 15               LD   (ix+15h),c   
+3624   DD 77 0B               LD   (ix+0Bh),a   
+3627   5E                     LD   e,(hl)   
+3628   57                     LD   d,a   
+3629   DD 73 0A               LD   (ix+0Ah),e   
+362C   23                     INC   hl   
+362D                LOC0828E:      
+362D   E5                     PUSH   hl   
+362E   DD 7E 0D               LD   a,(ix+0Dh)   
+3631   DD 35 14               DEC   (ix+14h)   
+3634   20 1A                  JR   nz,loc082B1   
+3636   0E 01                  LD   c,1   
+3638   DD 6E 06               LD   l,(ix+6)   
+363B   DD 66 07               LD   h,(ix+7)   
+363E                LOC0829F:      
+363E   7E                     LD   a,(hl)   
+363F   23                     INC   hl   
+3640   FE 60                  CP   60h   ; "`"
+3642   30 AA                  JR   nc,loc0824F   
+3644   DD 71 14               LD   (ix+14h),c   
+3647   DD 77 0D               LD   (ix+0Dh),a   
+364A   DD 75 06               LD   (ix+6),l   
+364D   DD 74 07               LD   (ix+7),h   
+3650                LOC082B1:      
+3650   DD 86 0E               ADD   a,(ix+0Eh)   
+3653   FE 5F                  CP   5Fh   ; ""
+3655   21 FF 07               LD   hl,7FFh   
+3658   28 16                  JR   z,loc082D1   
+365A                LOC082BB:      
+365A   C6 00                  ADD   a,0   
+365C   30 02                  JR   nc,loc082C1   
+365E   D6 60                  SUB   60h   ; "`"
+3660                LOC082C1:      
+3660   21 0C FF               LD   hl,0FF0Ch   
+3663   44                     LD   b,h   
+3664                LOC082C5:      
+3664   24                     INC   h   
+3665   95                     SUB   l   
+3666   30 FC                  JR   nc,loc082C5   
+3668   4F                     LD   c,a   
+3669   7C                     LD   a,h   
+366A   21 CB 34               LD   hl,unk0812C   
+366D   09                     ADD   hl,bc   
+366E   6E                     LD   l,(hl)   
+366F   67                     LD   h,a   
+3670                LOC082D1:      
+3670   19                     ADD   hl,de   
+3671   7C                     LD   a,h   
+3672   E6 07                  AND   7   
+3674   67                     LD   h,a   
+3675   7A                     LD   a,d   
+3676   0F                     RRCA      
+3677   0F                     RRCA      
+3678   0F                     RRCA      
+3679   E6 0F                  AND   0Fh   
+367B   08                     EX   af,af'   
+367C   EB                     EX   de,hl   
+367D   E1                     POP   hl   
+367E   DD 7E 0C               LD   a,(ix+0Ch)   
+3681   DD 35 16               DEC   (ix+16h)   
+3684   20 0D                  JR   nz,loc082F4   
+3686   7E                     LD   a,(hl)   
+3687   23                     INC   hl   
+3688                LOC082E9:      
+3688   FE 00                  CP   0   
+368A   20 35                  JR   nz,loc08322   
+368C   4E                     LD   c,(hl)   
+368D   23                     INC   hl   
+368E                LOC082EF:      
+368E   7E                     LD   a,(hl)   
+368F   23                     INC   hl   
+3690                LOC082F1:      
+3690   DD 71 16               LD   (ix+16h),c   
+3693                LOC082F4:      
+3693   DD 75 02               LD   (ix+2),l   
+3696   DD 74 03               LD   (ix+3),h   
+3699   DD 77 0C               LD   (ix+0Ch),a   
+369C   EB                     EX   de,hl   
+369D   DD 46 18               LD   b,(ix+18h)   
+36A0   4F                     LD   c,a   
+36A1   E6 0F                  AND   0Fh   
+36A3   90                     SUB   b   
+36A4   30 01                  JR   nc,loc08308   
+36A6   AF                     XOR   a   
+36A7                LOC08308:      
+36A7   5F                     LD   e,a   
+36A8   79                     LD   a,c   
+36A9   E6 F0                  AND   0F0h   ; "ð"
+36AB   CD F6 34               CALL   sub08157   
+36AE   90                     SUB   b   
+36AF   30 01                  JR   nc,loc08313   
+36B1   AF                     XOR   a   
+36B2                LOC08313:      
+36B2   57                     LD   d,a   
+36B3   DD 7E 17               LD   a,(ix+17h)   
+36B6   B7                     OR   a   
+36B7   7B                     LD   a,e   
+36B8   20 02                  JR   nz,loc0831D   
+36BA   7A                     LD   a,d   
+36BB   53                     LD   d,e   
+36BC                LOC0831D:      
+36BC   CD F6 34               CALL   sub08157   
+36BF   B2                     OR   d   
+36C0   C9                     RET      
+36C1                LOC08322:      
+36C1   E5                     PUSH   hl   
+36C2   47                     LD   b,a   
+36C3                LOC08324:      
+36C3   21 00 00               LD   hl,0   
+36C6                LOC08327:      
+36C6   7E                     LD   a,(hl)   
+36C7   B7                     OR   a   
+36C8   28 09                  JR   z,loc08334   
+36CA   23                     INC   hl   
+36CB   4E                     LD   c,(hl)   
+36CC   23                     INC   hl   
+36CD   B8                     CP   b   
+36CE   20 F6                  JR   nz,loc08327   
+36D0   E1                     POP   hl   
+36D1   18 BB                  JR   loc082EF   
+36D3                LOC08334:      
+36D3   E1                     POP   hl   
+36D4   0E 01                  LD   c,1   
+36D6   78                     LD   a,b   
+36D7   18 B7                  JR   loc082F1   
+36D9                WORD0833A:      
+36D9                          DS   25   
+36F2                WORD08353:      
+36F2                          DS   25   
+370B                WORD0836C:      
+370B                          DS   25   
+3724                WORD08385:      
+3724                          DS   25   
+373D                WORD0839E:      
+373D                          DS   25   
+3756                WORD083B7:      
+3756                          DS   25   
+376F   00           EAMPLITUDECH0:   DB   0   ;+00h - Amplitude 0 right/left
+3770   00           EAMPLITUDECH1:   DB   0   ;+01h - Amplitude 1 right/left
+3771   00           EAMPLITUDECH2:   DB   0   ;+02h - Amplitude 2 right/left
+3772   00           EAMPLITUDECH3:   DB   0   ;+03h - Amplitude 3 right/left
+3773   00           EAMPLITUDECH4:   DB   0   ;+04h - Amplitude 4 right/left
+3774   00           EAMPLITUDECH5:   DB   0   ;+05h - Amplitude 5 right/left
+3775   00                     DB   0   ;+06h - XXXX
+3776   00                     DB   0   ;+07h - XXXX
+3777   00           EFREQUENCYCH0:   DB   0   ;+08h - Frequency of tone 0
+3778   00                     DB   0   ;+09h - Frequency of tone 1
+3779   00           EFREQUENCYCH2:   DB   0   ;+0Ah - Frequency of tone 2
+377A   00                     DB   0   ;+0Bh - Frequency of tone 3
+377B   00           EFREQUENCYCH4:   DB   0   ;+0Ch - Frequency of tone 4
+377C   00                     DB   0   ;+0Dh - Frequency of tone 5
+377D   00                     DB   0   ;+OEh - XXXX
+377E   00                     DB   0   ;+0Fh - XXXX
+377F   00           EOCTAVECH0:   DB   0   ;+10h - Octave 1 and 0
+3780   00           EOCTAVECH2:   DB   0   ;+11h - Octave 3 and 2
+3781   00                     DB   0   ;+12h - Octave 5 and 4
+3782   00                     DB   0   ;+13h - XXXX
+3783   00           EFREQUENCYEN:   DB   0   ;+14h - Frequency enable
+3784   00                     DB   0   ;+15h - Noise enable
+3785   00           ENOISEGEN:   DB   0   ;+16h - Noise generator 0 and 1
+3786   00                     DB   0   ;+17h - XXXX
+3787   00           EENVELOPEGEN0:   DB   0   ;+18h - Envelope generator 0
+3788   00           EENVELOPEGEN1:   DB   0   ;+19h - Envelope generator 1
+3789   00 00        WORD083EA:   DW   0   
+378B                LOC083EC:      
+378B   22 0E 35               LD   (loc0816E+1),hl   ;á®åà ­¨¬  ¤à¥á ¬ã;ëª¨
+378E   CD 08 35               CALL   sub08169   ;¯®«ãç¨¬  ¤à¥á 1 â ¡«¨æë
+3791   ED 43 01 38            LD   (sub08461+1),bc   ;á®åà ­¨¬  ¤à¥á
+3795   CD 08 35               CALL   sub08169   ;¯®«ãç¨¬  ¤à¥á 2 â ¡«¨æë
+3798   ED 43 16 38            LD   (loc08476+1),bc   ;á®åà ­¨¬  ¤à¥á
+379C   CD 08 35               CALL   sub08169   ;¯®«ãç¨¬  ¤à¥á 3 â ¡«¨æë
+379F   ED 43 16 35            LD   (loc08176+1),bc   ;á®åà ­¨¬  ¤à¥á
+37A3   CD 08 35               CALL   sub08169   ;¯®«ãç¨¬  ¤à¥á 4 â ¡«¨æë
+37A6   ED 43 2D 35            LD   (loc0818D+1),bc   ;á®åà ­¨¬  ¤à¥á
+37AA   CD 08 35               CALL   sub08169   ;¯®«ãç¨¬  ¤à¥á 5 â ¡«¨æë
+37AD   0A                     LD   a,(bc)   
+37AE   03                     INC   bc   
+37AF   32 89 36               LD   (loc082E9+1),a   ;á®åà ­¨¬  ¤à¥á
+37B2   ED 43 C4 36            LD   (loc08324+1),bc   
+37B6   21 D9 36               LD   hl,word0833A   ;­ ç «ì­ë©  ¤à¥á á«ã¦¥¡­ëå ¤ ­­ëå
+37B9   06 B2                  LD   b,0B2h   ;à ;¬¥à ®¡« áâ¨ á«ã¦¥¡­ëå ¤ ­­ëå
+37BB   AF                     XOR   a   ;¡ ©â ; ¯®«­¥­¨ï - 00h
+37BC                LOC0841D:      
+37BC   77                     LD   (hl),a   ;®ç¨é ¥¬ á«ã¦¥¡­ãî ®¡« áâì
+37BD   23                     INC   hl   
+37BE   10 FC                  DJNZ   loc0841D   
+37C0   3C                     INC   a   
+37C1   32 A6 33               LD   (EPlayerPlay+1),a   ;ãáâ ­®¢¨¬ ­®¬¥à â¥ªãé¥£® ª ­ «  - 01h
+37C4   DD 21 D9 36            LD   ix,word0833A   ; ¤à¥á á«ã¦¥¡­ëå ¤ ­­ëå 1 ª ­ « 
+37C8   11 19 00               LD   de,19h   ;à ;¬¥à ¤ ­­ëå ¤«ï ®¤­®£® ª ­ « 
+37CB   06 06                  LD   b,6   
+37CD                LOC0842E:      
+37CD   DD 36 14 01            LD   (ix+14h),1   
+37D1   DD 36 15 01            LD   (ix+15h),1   
+37D5   DD 36 16 01            LD   (ix+16h),1   
+37D9   21 CB 34               LD   hl,unk0812C   
+37DC   DD 75 0F               LD   (ix+0Fh),l   
+37DF   DD 74 10               LD   (ix+10h),h   
+37E2   DD 75 02               LD   (ix+2),l   
+37E5   DD 74 03               LD   (ix+3),h   
+37E8   21 DD 34               LD   hl,unk0813E   
+37EB   DD 75 11               LD   (ix+11h),l   
+37EE   DD 74 12               LD   (ix+12h),h   
+37F1   DD 19                  ADD   ix,de   ;¯¥à¥å®¤¨¬ ª á«¥¤ãîé¥¬ã ª ­ «ã
+37F3   10 D8                  DJNZ   loc0842E   
+37F5   11 02 1C               LD   de,1C02h   ;à¥£¨áâà 1‘h SAA1099 - ¢ëª«îç¨¬ ;¢ãª
+37F8   01 43 00               LD   bc,SAAADDRPORT   
+37FB   ED 51                  OUT   (c),d   
+37FD   0D                     DEC   c   
+37FE   ED 59                  OUT   (c),e   ;¨­¨æâ «¨; æ¨ï ¬¨ªà®áå¥¬ë
+3800                SUB08461:      
+3800   21 00 00               LD   hl,0   ; ¤à¥á 1 â ¡«¨æë
+3803                LOC08464:      
+3803   4E                     LD   c,(hl)   
+3804   79                     LD   a,c   
+3805   23                     INC   hl   
+3806   3C                     INC   a   
+3807   28 3A                  JR   z,loc084A4   
+3809   3C                     INC   a   
+380A   28 3C                  JR   z,loc084A9   
+380C   D6 62                  SUB   62h   ; "b"
+380E   30 3D                  JR   nc,loc084AE   
+3810   22 01 38               LD   (sub08461+1),hl   
+3813   CB 21                  SLA   c   
+3815                LOC08476:      
+3815   21 00 00               LD   hl,0   
+3818   CD 03 35               CALL   sub08164   
+381B   ED 43 D9 36            LD   (word0833A),bc   
+381F   CD 08 35               CALL   sub08169   
+3822   ED 43 F2 36            LD   (word08353),bc   
+3826   CD 08 35               CALL   sub08169   
+3829   ED 43 0B 37            LD   (word0836C),bc   
+382D   CD 08 35               CALL   sub08169   
+3830   ED 43 24 37            LD   (word08385),bc   
+3834   CD 08 35               CALL   sub08169   
+3837   ED 43 3D 37            LD   (word0839E),bc   
+383B   CD 08 35               CALL   sub08169   
+383E   ED 43 56 37            LD   (word083B7),bc   
+3842   C9                     RET      
+3843                LOC084A4:      
+3843   21 00 00               LD   hl,0   
+3846   18 BB                  JR   loc08464   
+3848                LOC084A9:      
+3848   22 44 38               LD   (loc084A4+1),hl   
+384B   18 B6                  JR   loc08464   
+384D                LOC084AE:      
+384D   32 5B 36               LD   (loc082BB+1),a   
+3850   18 B1                  JR   loc08464   
+3852                             ;		.end
+3852                PROGRAM_END:      
+3852                          .END      
+
+
+SAAADDRPORT:        0043 DEFINED AT LINE 21
+                    > USED AT LINE 22
+                    > USED AT LINE 64
+                    > USED AT LINE 92
+                    > USED AT LINE 159 IN etplayer.z80
+                    > USED AT LINE 624 IN etplayer.z80
+SAADATAPORT:        0042 DEFINED AT LINE 22
+                    > USED AT LINE 67
+                    > USED AT LINE 95
+PROGRAM_START:      195F DEFINED AT LINE 30
+                    > USED AT LINE 25
+                    > USED AT LINE 30 IN CASheader.bin
+PROG:               1A03 DEFINED AT LINE 39
+PSAVE:              1A06 DEFINED AT LINE 42
+                    > USED AT LINE 56
+                    > USED AT LINE 102
+XITFLAG:            1A07 DEFINED AT LINE 44
+PMAIN:              1A08 DEFINED AT LINE 50
+                    > USED AT LINE 40
+TASK:               1A3B DEFINED AT LINE 80
+                    > USED AT LINE 87
+EXIT:               1A49 DEFINED AT LINE 89
+                    > USED AT LINE 85
+INTAT:              1A68 DEFINED AT LINE 118
+                    > USED AT LINE 79
+INTVISSZA:          1A8A DEFINED AT LINE 138
+                    > USED AT LINE 90
+L1D2F:              1AAC DEFINED AT LINE 158
+                    > USED AT LINE 140
+SAJATINT:           1AAF DEFINED AT LINE 165
+                    > USED AT LINE 133
+UT_PRNT:            1ACA DEFINED AT LINE 205
+                    > USED AT LINE 62
+UT_PRN0:            1ACD DEFINED AT LINE 206
+UT_PRN1:            1ACF DEFINED AT LINE 208
+                    > USED AT LINE 215
+INTROTXT:           1AD8 DEFINED AT LINE 222
+                    > USED AT LINE 61
+SONGDATA:           1B46 DEFINED AT LINE 228
+                    > USED AT LINE 74
+EPLAYERINIT:        339F DEFINED AT LINE 12 IN etplayer.z80
+                    > USED AT LINE 75
+                    > USED AT LINE 77
+EPLAYERPLAY:        33A5 DEFINED AT LINE 20 IN etplayer.z80
+                    > USED AT LINE 177
+                    > USED AT LINE 44 IN etplayer.z80
+                    > USED AT LINE 605 IN etplayer.z80
+LOC08011:           33B0 DEFINED AT LINE 27 IN etplayer.z80
+                    > USED AT LINE 33 IN etplayer.z80
+LOC08028:           33C7 DEFINED AT LINE 40 IN etplayer.z80
+                    > USED AT LINE 345 IN etplayer.z80
+LOC0802A:           33C9 DEFINED AT LINE 43 IN etplayer.z80
+                    > USED AT LINE 23 IN etplayer.z80
+LOC08055:           33F4 DEFINED AT LINE 60 IN etplayer.z80
+                    > USED AT LINE 52 IN etplayer.z80
+LOC08065:           3404 DEFINED AT LINE 68 IN etplayer.z80
+                    > USED AT LINE 65 IN etplayer.z80
+LOC08073:           3412 DEFINED AT LINE 75 IN etplayer.z80
+                    > USED AT LINE 63 IN etplayer.z80
+LOC08083:           3422 DEFINED AT LINE 83 IN etplayer.z80
+                    > USED AT LINE 80 IN etplayer.z80
+LOC08091:           3430 DEFINED AT LINE 90 IN etplayer.z80
+                    > USED AT LINE 78 IN etplayer.z80
+LOC080AB:           344A DEFINED AT LINE 102 IN etplayer.z80
+                    > USED AT LINE 93 IN etplayer.z80
+LOC080BB:           345A DEFINED AT LINE 110 IN etplayer.z80
+                    > USED AT LINE 107 IN etplayer.z80
+LOC080C9:           3468 DEFINED AT LINE 117 IN etplayer.z80
+                    > USED AT LINE 105 IN etplayer.z80
+LOC080DD:           347C DEFINED AT LINE 128 IN etplayer.z80
+                    > USED AT LINE 94 IN etplayer.z80
+                    > USED AT LINE 108 IN etplayer.z80
+LOC080E0:           347F DEFINED AT LINE 132 IN etplayer.z80
+                    > USED AT LINE 126 IN etplayer.z80
+LOC080E3:           3482 DEFINED AT LINE 137 IN etplayer.z80
+                    > USED AT LINE 53 IN etplayer.z80
+                    > USED AT LINE 66 IN etplayer.z80
+                    > USED AT LINE 81 IN etplayer.z80
+LOC080E5:           3484 DEFINED AT LINE 140 IN etplayer.z80
+                    > USED AT LINE 38 IN etplayer.z80
+LOC08114:           34B3 DEFINED AT LINE 167 IN etplayer.z80
+                    > USED AT LINE 176 IN etplayer.z80
+UNK0812C:           34CB DEFINED AT LINE 190 IN etplayer.z80
+                    > USED AT LINE 275 IN etplayer.z80
+                    > USED AT LINE 360 IN etplayer.z80
+                    > USED AT LINE 456 IN etplayer.z80
+                    > USED AT LINE 613 IN etplayer.z80
+UNK08131:           34D0 DEFINED AT LINE 195 IN etplayer.z80
+                    > USED AT LINE 333 IN etplayer.z80
+UNK0813E:           34DD DEFINED AT LINE 208 IN etplayer.z80
+                    > USED AT LINE 284 IN etplayer.z80
+                    > USED AT LINE 618 IN etplayer.z80
+UNK08140:           34DF DEFINED AT LINE 210 IN etplayer.z80
+                    > USED AT LINE 302 IN etplayer.z80
+SUB08157:           34F6 DEFINED AT LINE 235 IN etplayer.z80
+                    > USED AT LINE 36 IN etplayer.z80
+                    > USED AT LINE 145 IN etplayer.z80
+                    > USED AT LINE 150 IN etplayer.z80
+                    > USED AT LINE 156 IN etplayer.z80
+                    > USED AT LINE 503 IN etplayer.z80
+                    > USED AT LINE 516 IN etplayer.z80
+SUB0815C:           34FB DEFINED AT LINE 242 IN etplayer.z80
+                    > USED AT LINE 51 IN etplayer.z80
+                    > USED AT LINE 62 IN etplayer.z80
+                    > USED AT LINE 77 IN etplayer.z80
+                    > USED AT LINE 92 IN etplayer.z80
+                    > USED AT LINE 104 IN etplayer.z80
+                    > USED AT LINE 119 IN etplayer.z80
+SUB08164:           3503 DEFINED AT LINE 250 IN etplayer.z80
+                    > USED AT LINE 272 IN etplayer.z80
+                    > USED AT LINE 281 IN etplayer.z80
+                    > USED AT LINE 644 IN etplayer.z80
+SUB08169:           3508 DEFINED AT LINE 255 IN etplayer.z80
+                    > USED AT LINE 584 IN etplayer.z80
+                    > USED AT LINE 586 IN etplayer.z80
+                    > USED AT LINE 588 IN etplayer.z80
+                    > USED AT LINE 590 IN etplayer.z80
+                    > USED AT LINE 592 IN etplayer.z80
+                    > USED AT LINE 646 IN etplayer.z80
+                    > USED AT LINE 648 IN etplayer.z80
+                    > USED AT LINE 650 IN etplayer.z80
+                    > USED AT LINE 652 IN etplayer.z80
+                    > USED AT LINE 654 IN etplayer.z80
+LOC0816E:           350D DEFINED AT LINE 262 IN etplayer.z80
+                    > USED AT LINE 583 IN etplayer.z80
+LOC08176:           3515 DEFINED AT LINE 270 IN etplayer.z80
+                    > USED AT LINE 589 IN etplayer.z80
+LOC0818D:           352C DEFINED AT LINE 279 IN etplayer.z80
+                    > USED AT LINE 591 IN etplayer.z80
+SUB081A4:           3543 DEFINED AT LINE 288 IN etplayer.z80
+                    > USED AT LINE 29 IN etplayer.z80
+LOC081B1:           3550 DEFINED AT LINE 296 IN etplayer.z80
+                    > USED AT LINE 294 IN etplayer.z80
+LOC081B4:           3553 DEFINED AT LINE 298 IN etplayer.z80
+                    > USED AT LINE 369 IN etplayer.z80
+LOC081BA:           3559 DEFINED AT LINE 301 IN etplayer.z80
+                    > USED AT LINE 330 IN etplayer.z80
+                    > USED AT LINE 338 IN etplayer.z80
+                    > USED AT LINE 341 IN etplayer.z80
+                    > USED AT LINE 346 IN etplayer.z80
+                    > USED AT LINE 349 IN etplayer.z80
+                    > USED AT LINE 358 IN etplayer.z80
+LOC081BD:           355C DEFINED AT LINE 303 IN etplayer.z80
+                    > USED AT LINE 308 IN etplayer.z80
+LOC081C9:           3568 DEFINED AT LINE 313 IN etplayer.z80
+                    > USED AT LINE 312 IN etplayer.z80
+                    > USED AT LINE 314 IN etplayer.z80
+LOC081CB:           356A DEFINED AT LINE 315 IN etplayer.z80
+LOC081D4:           3573 DEFINED AT LINE 319 IN etplayer.z80
+                    > USED AT LINE 278 IN etplayer.z80
+                    > USED AT LINE 361 IN etplayer.z80
+LOC081E0:           357F DEFINED AT LINE 324 IN etplayer.z80
+                    > USED AT LINE 287 IN etplayer.z80
+LOC081F4:           3593 DEFINED AT LINE 331 IN etplayer.z80
+LOC081FB:           359A DEFINED AT LINE 336 IN etplayer.z80
+                    > USED AT LINE 297 IN etplayer.z80
+                    > USED AT LINE 354 IN etplayer.z80
+LOC08200:           359F DEFINED AT LINE 339 IN etplayer.z80
+LOC08205:           35A4 DEFINED AT LINE 342 IN etplayer.z80
+LOC0820C:           35AB DEFINED AT LINE 347 IN etplayer.z80
+LOC08211:           35B0 DEFINED AT LINE 350 IN etplayer.z80
+LOC08215:           35B4 DEFINED AT LINE 353 IN etplayer.z80
+                    > USED AT LINE 351 IN etplayer.z80
+LOC0821D:           35BC DEFINED AT LINE 359 IN etplayer.z80
+LOC08222:           35C1 DEFINED AT LINE 362 IN etplayer.z80
+LOC0822C:           35CB DEFINED AT LINE 367 IN etplayer.z80
+LOC08232:           35D1 DEFINED AT LINE 370 IN etplayer.z80
+                    > USED AT LINE 414 IN etplayer.z80
+LOC0823F:           35DE DEFINED AT LINE 378 IN etplayer.z80
+                    > USED AT LINE 372 IN etplayer.z80
+LOC08247:           35E6 DEFINED AT LINE 382 IN etplayer.z80
+                    > USED AT LINE 374 IN etplayer.z80
+LOC0824F:           35EE DEFINED AT LINE 386 IN etplayer.z80
+                    > USED AT LINE 433 IN etplayer.z80
+LOC0825A:           35F9 DEFINED AT LINE 394 IN etplayer.z80
+                    > USED AT LINE 388 IN etplayer.z80
+LOC08262:           3601 DEFINED AT LINE 398 IN etplayer.z80
+                    > USED AT LINE 390 IN etplayer.z80
+SUB0826A:           3609 DEFINED AT LINE 402 IN etplayer.z80
+                    > USED AT LINE 46 IN etplayer.z80
+                    > USED AT LINE 55 IN etplayer.z80
+                    > USED AT LINE 70 IN etplayer.z80
+                    > USED AT LINE 85 IN etplayer.z80
+                    > USED AT LINE 97 IN etplayer.z80
+                    > USED AT LINE 112 IN etplayer.z80
+LOC0827D:           361C DEFINED AT LINE 410 IN etplayer.z80
+                    > USED AT LINE 377 IN etplayer.z80
+                    > USED AT LINE 381 IN etplayer.z80
+                    > USED AT LINE 385 IN etplayer.z80
+LOC0828E:           362D DEFINED AT LINE 421 IN etplayer.z80
+                    > USED AT LINE 408 IN etplayer.z80
+LOC0829F:           363E DEFINED AT LINE 429 IN etplayer.z80
+                    > USED AT LINE 393 IN etplayer.z80
+                    > USED AT LINE 397 IN etplayer.z80
+                    > USED AT LINE 401 IN etplayer.z80
+LOC082B1:           3650 DEFINED AT LINE 438 IN etplayer.z80
+                    > USED AT LINE 425 IN etplayer.z80
+LOC082BB:           365A DEFINED AT LINE 443 IN etplayer.z80
+                    > USED AT LINE 664 IN etplayer.z80
+LOC082C1:           3660 DEFINED AT LINE 447 IN etplayer.z80
+                    > USED AT LINE 445 IN etplayer.z80
+LOC082C5:           3664 DEFINED AT LINE 450 IN etplayer.z80
+                    > USED AT LINE 453 IN etplayer.z80
+LOC082D1:           3670 DEFINED AT LINE 460 IN etplayer.z80
+                    > USED AT LINE 442 IN etplayer.z80
+LOC082E9:           3688 DEFINED AT LINE 478 IN etplayer.z80
+                    > USED AT LINE 595 IN etplayer.z80
+LOC082EF:           368E DEFINED AT LINE 483 IN etplayer.z80
+                    > USED AT LINE 534 IN etplayer.z80
+LOC082F1:           3690 DEFINED AT LINE 486 IN etplayer.z80
+                    > USED AT LINE 539 IN etplayer.z80
+LOC082F4:           3693 DEFINED AT LINE 488 IN etplayer.z80
+                    > USED AT LINE 475 IN etplayer.z80
+LOC08308:           36A7 DEFINED AT LINE 499 IN etplayer.z80
+                    > USED AT LINE 497 IN etplayer.z80
+LOC08313:           36B2 DEFINED AT LINE 507 IN etplayer.z80
+                    > USED AT LINE 505 IN etplayer.z80
+LOC0831D:           36BC DEFINED AT LINE 515 IN etplayer.z80
+                    > USED AT LINE 512 IN etplayer.z80
+LOC08322:           36C1 DEFINED AT LINE 519 IN etplayer.z80
+                    > USED AT LINE 480 IN etplayer.z80
+LOC08324:           36C3 DEFINED AT LINE 522 IN etplayer.z80
+                    > USED AT LINE 596 IN etplayer.z80
+LOC08327:           36C6 DEFINED AT LINE 524 IN etplayer.z80
+                    > USED AT LINE 532 IN etplayer.z80
+LOC08334:           36D3 DEFINED AT LINE 535 IN etplayer.z80
+                    > USED AT LINE 527 IN etplayer.z80
+WORD0833A:          36D9 DEFINED AT LINE 540 IN etplayer.z80
+                    > USED AT LINE 24 IN etplayer.z80
+                    > USED AT LINE 45 IN etplayer.z80
+                    > USED AT LINE 597 IN etplayer.z80
+                    > USED AT LINE 606 IN etplayer.z80
+                    > USED AT LINE 645 IN etplayer.z80
+WORD08353:          36F2 DEFINED AT LINE 542 IN etplayer.z80
+                    > USED AT LINE 54 IN etplayer.z80
+                    > USED AT LINE 647 IN etplayer.z80
+WORD0836C:          370B DEFINED AT LINE 544 IN etplayer.z80
+                    > USED AT LINE 69 IN etplayer.z80
+                    > USED AT LINE 649 IN etplayer.z80
+WORD08385:          3724 DEFINED AT LINE 546 IN etplayer.z80
+                    > USED AT LINE 84 IN etplayer.z80
+                    > USED AT LINE 651 IN etplayer.z80
+WORD0839E:          373D DEFINED AT LINE 548 IN etplayer.z80
+                    > USED AT LINE 96 IN etplayer.z80
+                    > USED AT LINE 653 IN etplayer.z80
+WORD083B7:          3756 DEFINED AT LINE 550 IN etplayer.z80
+                    > USED AT LINE 111 IN etplayer.z80
+                    > USED AT LINE 655 IN etplayer.z80
+EAMPLITUDECH0:      376F DEFINED AT LINE 553 IN etplayer.z80
+                    > USED AT LINE 47 IN etplayer.z80
+EAMPLITUDECH1:      3770 DEFINED AT LINE 554 IN etplayer.z80
+                    > USED AT LINE 56 IN etplayer.z80
+EAMPLITUDECH2:      3771 DEFINED AT LINE 555 IN etplayer.z80
+                    > USED AT LINE 71 IN etplayer.z80
+EAMPLITUDECH3:      3772 DEFINED AT LINE 556 IN etplayer.z80
+                    > USED AT LINE 86 IN etplayer.z80
+EAMPLITUDECH4:      3773 DEFINED AT LINE 557 IN etplayer.z80
+                    > USED AT LINE 98 IN etplayer.z80
+EAMPLITUDECH5:      3774 DEFINED AT LINE 558 IN etplayer.z80
+                    > USED AT LINE 113 IN etplayer.z80
+EFREQUENCYCH0:      3777 DEFINED AT LINE 561 IN etplayer.z80
+                    > USED AT LINE 48 IN etplayer.z80
+                    > USED AT LINE 57 IN etplayer.z80
+EFREQUENCYCH2:      3779 DEFINED AT LINE 563 IN etplayer.z80
+                    > USED AT LINE 72 IN etplayer.z80
+                    > USED AT LINE 87 IN etplayer.z80
+EFREQUENCYCH4:      377B DEFINED AT LINE 565 IN etplayer.z80
+                    > USED AT LINE 99 IN etplayer.z80
+                    > USED AT LINE 114 IN etplayer.z80
+EOCTAVECH0:         377F DEFINED AT LINE 569 IN etplayer.z80
+                    > USED AT LINE 158 IN etplayer.z80
+EOCTAVECH2:         3780 DEFINED AT LINE 570 IN etplayer.z80
+                    > USED AT LINE 153 IN etplayer.z80
+EFREQUENCYEN:       3783 DEFINED AT LINE 573 IN etplayer.z80
+                    > USED AT LINE 124 IN etplayer.z80
+ENOISEGEN:          3785 DEFINED AT LINE 575 IN etplayer.z80
+                    > USED AT LINE 142 IN etplayer.z80
+EENVELOPEGEN0:      3787 DEFINED AT LINE 577 IN etplayer.z80
+                    > USED AT LINE 293 IN etplayer.z80
+EENVELOPEGEN1:      3788 DEFINED AT LINE 578 IN etplayer.z80
+                    > USED AT LINE 164 IN etplayer.z80
+WORD083EA:          3789 DEFINED AT LINE 580 IN etplayer.z80
+                    > USED AT LINE 34 IN etplayer.z80
+LOC083EC:           378B DEFINED AT LINE 582 IN etplayer.z80
+                    > USED AT LINE 14 IN etplayer.z80
+LOC0841D:           37BC DEFINED AT LINE 600 IN etplayer.z80
+                    > USED AT LINE 603 IN etplayer.z80
+LOC0842E:           37CD DEFINED AT LINE 609 IN etplayer.z80
+                    > USED AT LINE 622 IN etplayer.z80
+SUB08461:           3800 DEFINED AT LINE 628 IN etplayer.z80
+                    > USED AT LINE 368 IN etplayer.z80
+                    > USED AT LINE 585 IN etplayer.z80
+                    > USED AT LINE 640 IN etplayer.z80
+LOC08464:           3803 DEFINED AT LINE 630 IN etplayer.z80
+                    > USED AT LINE 659 IN etplayer.z80
+                    > USED AT LINE 662 IN etplayer.z80
+                    > USED AT LINE 665 IN etplayer.z80
+LOC08476:           3815 DEFINED AT LINE 642 IN etplayer.z80
+                    > USED AT LINE 587 IN etplayer.z80
+LOC084A4:           3843 DEFINED AT LINE 657 IN etplayer.z80
+                    > USED AT LINE 635 IN etplayer.z80
+                    > USED AT LINE 661 IN etplayer.z80
+LOC084A9:           3848 DEFINED AT LINE 660 IN etplayer.z80
+                    > USED AT LINE 637 IN etplayer.z80
+LOC084AE:           384D DEFINED AT LINE 663 IN etplayer.z80
+                    > USED AT LINE 639 IN etplayer.z80
+PROGRAM_END:        3852 DEFINED AT LINE 234
+                    > USED AT LINE 26
+                    > USED AT LINE 30 IN CASheader.bin

@@ -1,0 +1,102 @@
+U0_DEMO_SN:          
+; freq =3579545 / 32 / p  @3.579545MHz
+; p  = 3579545/(f*32)
+
+SN_CODE_SND =       $10 
+SN_CODE_DEL =       $11 
+SN_CODE_VOL =       $12 
+SN_CODE_END =       $13 
+
+            LD      hl,DEMO_SN_STR 
+            CALL    PRINT_ISTRING 
+
+
+            LD      a,(FC_PORT) 
+            LD      c,a 
+            LD      hl,SN_SEQUENCE 
+            CALL    U0_PLAYER_LOOP 
+            RET      
+
+
+
+SN_PLAYER:           
+            LD      a,b 
+            CP      SN_CODE_SND ; play sound
+            JP      z,SN_SEQ_SOUND_PLAY 
+            CP      SN_CODE_DEL ; delay
+            JP      z,ALL_SEQ_DELAY 
+            CP      SN_CODE_VOL ; volume
+            JP      z,SN_SEQ_VOLUME 
+            CP      SN_CODE_END 
+            JP      z,SN_SEQ_DONE 
+
+SN_SEQ_SOUND_PLAY:   ; SN_CODE_SND,<channel>,<low 4 bits>, <high 6 bits>
+            INC     hl 
+            LD      a,(hl) ; channel
+            RRCA     
+            RRCA     
+            RRCA     
+            OR      $80 
+            INC     hl 
+            OR      (hl) 
+            OUT     (C),a 
+            CALL    u0_delay_CMD_SN 
+            INC     hl 
+            LD      a,(hl) 
+            OUT     (C),a 
+            INC     hl 
+            JP      U0_PLAYER_LOOP 
+
+SN_SEQ_DELAY:        
+; same as TVC_DELAY
+
+SN_SEQ_VOLUME:       ; SN_CODE_VOL, <channel>,<volume>
+            INC     hl 
+            LD      a,(hl) ; channel
+            RRCA     
+            RRCA     
+            RRCA     
+            OR      10010000b 
+            INC     hl 
+            OR      (hl) 
+            OUT     (C),a 
+            INC     hl 
+            JP      U0_PLAYER_LOOP 
+
+SN_SEQ_DONE:         
+            LD      a,10011111b 
+            OUT     (C),a 
+            CALL    u0_delay_CMD_SN 
+            LD      a,10111111b 
+            OUT     (C),a 
+            CALL    u0_delay_CMD_SN 
+            LD      a,11011111b 
+            OUT     (C),a 
+            CALL    u0_delay_CMD_SN 
+            LD      a,11111111b 
+            OUT     (C),a 
+U0_DELAY_CMD_SN:     
+            RET      
+
+SN_SEQUENCE:         
+            DB      SN_CODE_SND,0,((357954500 + 16*C)/(32*C)) & $0f,((357954500 + 16*C)/(32*C)) & $3F0 / 16 
+            DB      SN_CODE_VOL,0,0,SN_CODE_DEL,$F0 
+            DB      SN_CODE_VOL,0,1,SN_CODE_DEL,$30 
+            DB      SN_CODE_VOL,0,2,SN_CODE_DEL,$30 
+            DB      SN_CODE_VOL,0,3,SN_CODE_DEL,$30 
+            DB      SN_CODE_SND,1,((357954500 + 16*D)/(32*D)) & $0f,((357954500 + 16*D)/(32*D)) & $3F0 / 16 
+            DB      SN_CODE_VOL,0,4,SN_CODE_VOL,1,0,SN_CODE_DEL,$F0 
+            DB      SN_CODE_VOL,0,5,SN_CODE_VOL,1,1,SN_CODE_DEL,$30 
+            DB      SN_CODE_VOL,0,6,SN_CODE_VOL,1,2,SN_CODE_DEL,$30 
+            DB      SN_CODE_VOL,0,7,SN_CODE_VOL,1,3,SN_CODE_DEL,$30
+            DB      SN_CODE_SND,2,((357954500 + 16*E)/(32*E)) & $0f,((357954500 + 16*E)/(32*E)) & $3F0 / 16 
+            DB      SN_CODE_VOL,1,4,SN_CODE_VOL,2,0,SN_CODE_DEL,$F0 
+            DB      SN_CODE_VOL,1,5,SN_CODE_VOL,2,1,SN_CODE_DEL,$30 
+            DB      SN_CODE_VOL,1,6,SN_CODE_VOL,2,2,SN_CODE_DEL,$30 
+            DB      SN_CODE_VOL,1,7,SN_CODE_VOL,2,3,SN_CODE_DEL,$30 
+            DB      SN_CODE_VOL,1,8,SN_CODE_VOL,2,4,SN_CODE_DEL,$30 
+            DB      SN_CODE_VOL,2,5,SN_CODE_DEL,$30
+            DB      SN_CODE_VOL,2,6,SN_CODE_DEL,$30 
+            DB      SN_CODE_VOL,2,9,SN_CODE_DEL,$A0 
+            DB      SN_CODE_VOL,0,15,SN_CODE_VOL,1,15,SN_CODE_VOL,2,15 
+            DB      SN_CODE_END 

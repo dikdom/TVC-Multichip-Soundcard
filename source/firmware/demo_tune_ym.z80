@@ -1,0 +1,217 @@
+STACK_STORE:         
+            DW      $1975 
+
+YM_PLAYER:           
+            JP      U0_PLAYER_LOOP 
+
+U0_DEMO_YM:          
+            LD      hl,DEMO_YM_STR 
+            CALL    PRINT_ISTRING 
+
+
+
+;VGM: 71T (70.861678.. T = 1/44100 s) for each sample
+
+
+YM_PLAY:             
+            LD      de,YM_SONG+$34 
+            LD      hl,(YM_SONG + $34) 
+            ADD     hl,de 
+            LD      a,(FC_PORT) 
+
+            ADD     a,4 
+            LD      (YM_OUT_1+1),a 
+            INC     a 
+            LD      (YM_OUT_2+1),a 
+
+; SP is used to fetch 16bit data fast(-er than normal)
+            LD      (STACK_STORE),SP 
+
+
+YM_PLAY_LOOP:        
+            LD      a,(hl) 
+            INC     hl 
+            CP      $50 ; let's leave the garbage here, for timing...
+            JR      z,YM_PLAY_LOOP 
+            CP      $70 
+            JR      z,YM_PLAY_LOOP ; done
+            CP      $71 
+            JR      z,SKIP_1_FRAME ; done
+            CP      $72 
+            JR      z,SKIP_2_FRAMES ; done
+            LD      b,a 
+            AND     $70 
+            CP      $70 
+            LD      a,b 
+            JR      z,SKIP_FRAMES_SHORT ; done
+            CP      $61 
+            JR      z,SKIP_FRAMES_LONG ; done
+            CP      $5A 
+            JP      z,PLAY_YM3812_TONE 
+            CP      $BD 
+            JP      z,YM_PLAY_LOOP 
+            CP      $62 
+            JR      z,SKIP_60TH ; done
+            CP      $63 
+            JP      z,SKIP_50TH 
+            CP      $66 
+            JP      z,YM_PLAY_SONG_FINISH 
+
+; not recognized
+            JR      YM_PLAY_LOOP 
+
+SKIP_1_FRAME:        
+            JP      YM_PLAY_LOOP 
+SKIP_2_FRAMES:       
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            INC     de 
+            INC     de 
+            INC     de 
+            JP      YM_PLAY_LOOP 
+
+SKIP_FRAMES_SHORT:   
+            AND     $0f 
+            SUB     2 
+            LD      b,a 
+
+            INC     ix ; filler
+            INC     de ; filler
+
+SHORT_LOOP:          
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            INC     ix ; 10 T
+            SLA     A ; 8T
+            DJNZ    SHORT_LOOP ; 13T on jump. 8 on done
+
+            JP      YM_PLAY_LOOP 
+SKIP_FRAMES_LONG:    
+            LD      e,(hl) 
+            INC     hl 
+            LD      d,(hl) 
+            INC     hl 
+            DEC     de 
+            DEC     de 
+            DEC     de 
+            DEC     de 
+
+            LD      ix,($1975) ; 20 T
+            INC     IX ; 10 T
+
+
+            LD      a,$FF 
+LONG_LOOP:           
+; 49 T
+            LD      ix,($1975) ; 20 T
+            ADD     ix,bc ; 15
+            INC     ix ; 10 T
+            NOP      ; 4
+; ---
+
+            DEC     de 
+            CP      d 
+            JR      nz,LONG_LOOP 
+
+            JP      YM_PLAY_LOOP 
+SKIP_60TH:           
+; all: 52185 T  (735*71)
+; wait here: 52185-141=52044
+            LD      b,244 
+NTSC_LOOP:           
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            DJNZ    NTSC_LOOP 
+
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            INC     IX ; 10 T
+
+            JP      YM_PLAY_LOOP 
+
+
+SKIP_50TH:           
+; all: 62500 T (882*71 samples, 20ms)
+; wait here: 62313 T (62500 - 187)
+            LD      b,199 ; 7T
+PAL_LOOP:            
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            DJNZ    PAL_LOOP ; 13/8T
+
+            LD      ix,($1975) ; 20 T
+            XOR     A ; 4T
+
+            JP      YM_PLAY_LOOP 
+
+YM_PLAY_SONG_FINISH:  
+            LD      SP,(STACK_STORE) 
+            CALL    MUTE_YM3812 
+            RET      
+
+PLAY_YM3812_TONE:    
+            LD      sp,hl 
+            POP     de 
+            INC     hl 
+            LD      a,e 
+YM_OUT_1:            
+            OUT     ($34),a ; Must be 12T (3.3us) between addr and data writes
+            LD      a,d ; 4T
+            INC     hl ; 6T
+;             + 7T: M1 plus M2 cycles of OUT (n),A
+YM_OUT_2:            
+            OUT     ($35),a 
+; must be 71T (23us) between data and next addr write. It's 165T.
+            JP      YM_PLAY_LOOP 
+MUTE_CHIPS:          
+MUTE_YM3812:         
+            LD      a,(FC_PORT) 
+            ADD     a,$04 
+            LD      c,a 
+            LD      b,$00 
+YM3812_RESET_LOOP:   
+            LD      a,b 
+            OUT     (C),a 
+            NOP      
+            INC     C 
+            XOR     a 
+            OUT     (C),a 
+            CALL    WAIT_SOME_TIME ; call+ret = 27T
+            CALL    WAIT_SOME_TIME 
+            CALL    WAIT_SOME_TIME 
+            DEC     c 
+            INC     b 
+            JR      nz,YM3812_RESET_LOOP 
+            DEC     c 
+            DEC     c 
+WAIT_SOME_TIME:      
+            RET      
+
+
+
+
+YM_SONG:             
+            .INCBIN "OutZone-Ending.vgm" 
+PROGRAM_END:         

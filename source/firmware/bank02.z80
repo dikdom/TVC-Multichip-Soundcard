@@ -1,0 +1,193 @@
+            .ORG    $A000 
+            DB      "THIS IS BANK #2" 
+
+            .ORG    CHECK_BOARD_TYPE-$2000 
+            .PHASE  CHECK_BOARD_TYPE 
+FINAL_BOARD_DETECTED_IN_B2:  
+            LD      a,$01 
+            LD      (PROTO_BOARD),a 
+            LD      a,(PORTBASE) 
+            ADD     a,$06 
+            LD      c,a 
+            LD      a,00000011b 
+            OUT     (C),a 
+; from here the last bank's code is executed again
+            JR      FINAL_BOARD_DETECTED_IN_B2 
+
+RET_TO_BASE_BANK_FROM_B2:  
+            LD      a,(PORTBASE) 
+            ADD     a,$06 
+            LD      c,a 
+            LD      a,00000011b 
+            OUT     (C),a 
+            JP      (hl) 
+
+
+
+;----------------------------------------------
+; The source of SAA player in the SNDMX firmware is coming from:
+; 
+; 
+; SNDMgc test program, SAA1099 test, based on
+; Miklós Hanák work
+; 
+; 
+; SAA1099P test program for TVC
+; 2013 RetroHW
+; 
+; Source:
+;        http://sdinterface.atw.hu (TVC demo)
+;        http://wwww.micklab.narod.ru (ETunes)
+;        http://www.keprt.cz (Songs)
+;----------------------------------------------
+
+
+SAA_DEMO_SONG_PLAY:  
+
+            LD      bc,U0_SAAPLAYER_ROUTINE_END - U0_SAAPLAYER_ROUTINE_START 
+            LD      hl,BANK2_SAAPLAYER_START 
+            LD      de,U0_ROUTINE_TARGET_END 
+            LDIR     
+
+            LD      a,(FC_PORT) 
+            ADD     a,$03 
+            LD      c,a 
+            LD      b,28 
+            OUT     (c),b 
+            DEC     c 
+            LD      b,1 
+            OUT     (c),b ;Enabling SAA
+
+            LD      hl,songdata 
+            LD      (EPlayerInit+1),hl ; Passing the song data pointer
+
+            CALL    EPlayerInit ; initializing the player
+
+            CALL    setupInterrupt ; Setting up interrupt
+; 
+            LD      a,$d0 
+            OUT     ($02),a 
+            LD      hl,LAST_PLAYER_BANK_B2 
+TASK:                
+;    call PRINT_NUMS_FROM_B2
+
+            LD      a,(sub08461+1) 
+            CP      (hl) 
+            JR      z,task 
+            LD      a,(hl) 
+            CP      $94 
+            JR      z,exit 
+            LD      a,(sub08461+1) 
+            LD      (hl),a 
+;    call PRINT_NUMS_FROM_B2
+
+            JP      task 
+
+EXIT:                
+            DI       
+            CALL    revertInterrupt ; reset interrupt
+
+            LD      a,(FC_PORT) 
+            ADD     a,$03 
+            LD      c,a 
+            LD      b,28 
+            OUT     (c),b 
+            DEC     c 
+            LD      b,0 
+            OUT     (c),b ; Disabling SAA
+
+
+            JP      RET_TO_BASE_BANK_FROM_B2 
+
+
+; 
+; Setting up the interrupt, so SAA music player must be
+; called once in every 1/50th sec (TVC is PAL system)
+; 
+SETUPINTERRUPT:      
+
+            DI       ; Disable interrupts while setting up a new service routine
+            LD      a,(0B12h) ; A reg.= mirror of Port5
+            RES     5,a ; Disable sound interrupt
+            RES     4,a ; Disable sound
+            LD      (0B12h),a ; Storing port 5 mirror value
+            OUT     (005h),a ; and to the port 5
+
+            LD      a,00Ah ; CRTC register R10: enable cursor
+            OUT     (070h),a 
+            LD      a,003h 
+            OUT     (071h),a 
+            LD      a,0C3h ; A register => Z80 assembly code of JP XXXX
+            LD      (0038h),a ; Interrupt address first byte
+            LD      hl,OWN_INTERRUPT 
+            LD      (0039h),hl ; jump address in default interrupt routine
+            EI       ; enable interrupts. player is already initialized.
+            RET      
+
+REVERTINTERRUPT:     
+            DI       ; Disable further interrupts
+            LD      hl,L1D2F ; HL= eredeti megszak. rutin visszaállítandó kódrészlete
+            LD      de,0038h ; DE= megszak. címe
+            LD      bc,0003h ; BC= 3 bájt lesz
+            LDIR     ; bájtok másolása
+            LD      a,(0B12h) ; A reg.= Port5 tükörképe
+            RES     5,a ; hang IT tiltva
+            RES     4,a ; hangjel is tiltva
+            LD      (0B12h),a ; új érték a memóriába
+            OUT     (005h),a ; és a portra
+            LD      a,00Ah ; CRTC R10-es regiszterében a kurzor engedélyezése
+            OUT     (070h),a 
+            LD      a,003h 
+            OUT     (071h),a 
+            RET      
+; 
+;   Original interrup routing codre snippet. (Doesn't make any difference
+;   as initilizing the interrupt routine is done after initializing the IO
+;   cards)
+; 
+L1D2F:      PUSH    af 
+            LD      a,070h 
+
+; 
+; 
+;   Own interrupt service routine
+; 
+OWN_INTERRUPT:       
+            DI       ; no more interrupts during servicing this one
+            PUSH    af ; Save register A
+            LD      a,02h ; 
+            OUT     (007h),a ; cursor/sound interrupt request acknowledge (write anything)
+
+            PUSH    hl 
+            PUSH    bc 
+            PUSH    de 
+
+            CALL    EPlayerPlay 
+
+            POP     de 
+            POP     bc 
+            POP     hl 
+
+            POP     af ; Restore register A
+            EI       ; Enable further interrupts (next cursor irq)
+            RET      ; done
+
+
+            .ORG    $C200 
+SONGDATA:            
+            .INCBIN "Sean Bernard - Pop 'N' Twin Bee.etc" 
+BANK2_SAAPLAYER_START:  
+            .DEPHASE  
+
+            .PHASE  U0_ROUTINE_TARGET_END 
+U0_SAAPLAYER_ROUTINE_START:  
+            .INCLUDE "etplayer.z80" 
+
+; DEBUG!!
+; .include "bank02_debug.z80"
+LAST_PLAYER_BANK_B2:  
+            DB      $5b 
+U0_SAAPLAYER_ROUTINE_END:  
+            .DEPHASE  
+
+

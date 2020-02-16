@@ -1,0 +1,379 @@
+;VGM: 71T (70.861678.. T = 1/44100 s) for each sample
+
+            .BINFROM PROGRAM_START 
+            .BINTO  PROGRAM_END 
+            .ENT    prog 
+
+            .ORG    (6639 - $90) 
+
+PROGRAM_START:       
+            .INCLUDE CASheader.bin 
+
+            .ORG    6639 
+            DB      0FH,0AH,0,0DDH 
+            DB      " USR" 
+            DB      96H,"6659" 
+            DB      95H,0FFH,0,0,0,0,0 ; 20 byte program header
+; 
+PROG:                
+            JP      MAIN ; program start
+STACK_STORE:         
+            DW      $1975 
+PORT_BASE:
+            db $75
+SND_MX:
+            db 0x05
+            db "SndMx"
+
+MAIN:                
+            DI       
+            PUSH    bc 
+            PUSH    de
+            ld a,$10
+            ld (PORT_BASE),a
+            ld de,$0040
+CHECK_ID:
+            ld hl,SND_MX
+            ld b,$06
+check_id_loop:
+            ld a,(de)
+            cp (hl)
+            inc hl
+            inc de
+            jr nz,NO_MATCH
+            djnz check_id_loop
+            jr PLAY
+NO_MATCH:
+            ld a,(PORT_BASE)
+            add a,$10
+            ld (PORT_BASE),a
+            cp $50
+            jr z,NO_CARD_FOUND
+            RRCA
+            RRCA
+            RRCA
+            RRCA
+            ld b,a
+            ld a,$10
+MEM_BASE_LOOP:
+            add a,$30
+            djnz MEM_BASE_LOOP
+            ld e,a
+            xor a
+            ld d,a
+            jr CHECK_ID
+NO_CARD_FOUND:
+    pop de
+    pop bc
+    ld hl,$FFFF
+    di
+    ret
+            
+PLAY:            
+            LD      de,SONG+$34 
+            LD      hl,(SONG + $34) 
+            ADD     hl,de 
+            ld      a,(PORT_BASE)
+            LD      c,a 
+
+            ADD     a,3 
+            LD      (SAA_OUT_1+1),a 
+            DEC     a 
+            LD      (SAA_OUT_2+1),a 
+            ADD     a,2 
+            LD      (YM_OUT_1+1),a 
+            INC     a 
+            LD      (YM_OUT_2+1),a 
+
+; SP is used to fetch 16bit data fast(-er than normal)
+            LD      (STACK_STORE),SP 
+
+            LD      a,($0b11) 
+            AND     $f0 
+            OR      $07 
+            OUT     ($03),a 
+; don't start until every key is released in the row of Space
+KEY_PRESSED_LOOP:    
+            IN      a,($58) 
+            CP      $FF 
+            JR      nz,key_pressed_loop 
+
+PLAY_LOOP:           
+            LD      a,(hl) 
+            INC     hl 
+            CP      $50 
+            JR      z,PLAY_SN_TONE 
+            CP      $70 
+            JR      z,PLAY_LOOP ; done
+            CP      $71 
+            JR      z,SKIP_1_FRAME ; done
+            CP      $72 
+            JR      z,SKIP_2_FRAMES ; done
+            LD      b,a 
+            AND     $70 
+            CP      $70 
+            LD      a,b 
+            JR      z,SKIP_FRAMES_SHORT ; done
+            CP      $61 
+            JR      z,SKIP_FRAMES_LONG ; done
+            CP      $5A 
+            JP      z,PLAY_YM3812_TONE 
+            CP      $BD 
+            JP      z,PLAY_SAA1099_TONE 
+            CP      $62 
+            JR      z,SKIP_60TH ; done
+            CP      $63 
+            JP      z,SKIP_50TH 
+            CP      $66 
+            JP      z,PLAY_SONG_FINISH 
+
+; not recognized
+            JR      play_loop 
+
+PLAY_SN_TONE:        
+            LD      a,(hl) 
+            OUT     (c),a 
+            INC     hl 
+            INC     a 
+            JP      play_loop 
+
+SKIP_1_FRAME:        
+            JP      play_loop 
+SKIP_2_FRAMES:       
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            INC     de 
+            INC     de 
+            INC     de 
+            JP      play_loop 
+
+SKIP_FRAMES_SHORT:   
+            AND     $0f 
+            SUB     2 
+            LD      b,a 
+
+            INC     ix ; filler
+            INC     de ; filler
+
+SHORT_LOOP:          
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            INC     ix ; 10 T
+            SLA     A ; 8T
+            DJNZ    SHORT_LOOP ; 13T on jump. 8 on done
+
+            JP      play_loop 
+SKIP_FRAMES_LONG:    
+            LD      e,(hl) 
+            INC     hl 
+            LD      d,(hl) 
+            INC     hl 
+            DEC     de 
+            DEC     de 
+            DEC     de 
+            DEC     de 
+
+; 30T
+            IN      a,($58) ; 11T
+            BIT     5,a ; 8T
+            JR      z,PLAY_SONG_STOPPED ; 7T
+            NOP      ; 4T
+            NOP      ; 4 T
+
+
+            LD      a,$FF 
+LONG_LOOP:           
+; 49 T
+            LD      ix,($1975) ; 20 T
+            ADD     ix,bc ; 15
+            INC     ix ; 10 T
+            NOP      ; 4
+; ---
+
+            DEC     de 
+            CP      d 
+            JR      nz,LONG_LOOP 
+
+            JP      play_loop 
+SKIP_60TH:           
+; all: 52185 T  (735*71)
+; wait here: 52185-141=52044
+            LD      b,244 
+NTSC_LOOP:           
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            DJNZ    NTSC_LOOP 
+
+; 30T
+            IN      a,($58) ; 11T
+            BIT     5,a ; 8T
+            JR      z,PLAY_SONG_STOPPED ; 7T
+            NOP      ; 4T
+
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+
+
+            JP      play_loop 
+
+PLAY_SONG_STOPPED:   
+            LD      hl,1 
+            JR      PLAY_SONG_FINISH_HL_SET
+
+SKIP_50TH:           
+; all: 62500 T (882*71 samples, 20ms)
+; wait here: 62313 T (62500 - 187)
+            LD      b,199      ; 7T
+PAL_LOOP:           
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            LD      ix,($1975) ; 20 T
+            DJNZ    PAL_LOOP   ; 13/8T
+
+            LD      ix,($1975) ; 20 T
+            XOR A              ; 4T
+
+            JP      play_loop 
+
+PLAY_SONG_FINISH:    
+            LD      hl,0 
+PLAY_SONG_FINISH_HL_SET:
+            LD      SP,(STACK_STORE) 
+            POP     de 
+            POP     bc 
+            CALL    mute_chips 
+KEY_PRESSED_LOOP_FINISH:  
+            IN      a,($58) 
+            CP      $ff 
+            JR      nz,key_pressed_loop_finish 
+            LD      a,($0b11) 
+            OUT     ($03),a 
+            EI       
+            RET      
+PLAY_SAA1099_TONE:   
+            LD      sp,hl 
+            POP     de 
+            INC     hl 
+            INC     hl 
+            LD      a,e 
+SAA_OUT_1:           
+            OUT     ($33),a 
+            LD      a,d 
+SAA_OUT_2:           
+            OUT     ($32),a 
+
+            JP      play_loop 
+
+PLAY_YM3812_TONE:    
+            LD      sp,hl 
+            POP     de 
+            INC     hl 
+            LD      a,e 
+YM_OUT_1:            
+            OUT     ($34),a ; Must be 12T (3.3us) between addr and data writes
+            LD      a,d ; 4T
+            INC     hl  ; 6T
+            ;             + 7T: M1 plus M2 cycles of OUT (n),A
+YM_OUT_2:            
+            OUT     ($35),a 
+            ; must be 71T (23us) between data and next addr write. It's 165T.
+            JP      play_loop 
+MUTE_CHIPS:          
+            CALL    MUTE_SN76489 
+            CALL    MUTE_SAA1099
+            call    MUTE_YM3812
+            RET      
+
+MUTE_SN76489:        
+            LD      a,10011111b 
+            OUT     (C),a 
+            CALL    WAIT_SOME_TIME ; call+ret = 27T
+            LD      a,10111111b ; 8T, 27+8=35T. SN chip is safely written (>28T)
+            OUT     (C),a 
+            CALL    WAIT_SOME_TIME 
+            LD      a,11011111b 
+            OUT     (C),a 
+            CALL    WAIT_SOME_TIME 
+            LD      a,11111111b 
+            OUT     (C),a 
+            CALL    WAIT_SOME_TIME 
+
+WAIT_SOME_TIME:      
+            RET      
+
+MUTE_SAA1099:
+            ld a,c
+            add a,$03
+            ld c,a
+            ld a,$1C
+            out (C),a
+            xor a
+            dec C
+            out (C),a
+            dec C
+            dec C
+            ret
+MUTE_YM3812:
+            ld a,c
+            add a,$04
+            ld c,a
+            ld b,$00
+YM3812_RESET_LOOP:
+            ld a,b
+            out (C),a
+            NOP
+            inc C
+            xor a
+            out (C),a
+            call WAIT_SOME_TIME ; call+ret = 27T
+            call WAIT_SOME_TIME
+            call WAIT_SOME_TIME
+            dec c
+            inc b
+            jr nz,YM3812_RESET_LOOP
+            dec c
+            dec c
+            ret
+            
+            
+
+
+SONG:                
+            .INCBIN "yie-ar-kungfu.vgm" 
+PROGRAM_END:         
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

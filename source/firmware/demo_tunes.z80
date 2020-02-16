@@ -1,0 +1,67 @@
+C           =       13081 ; 130.81 Hz, TVC 2602, 
+C_SH        =       13859 
+D           =       14683 
+D_SH        =       15556 
+E           =       16481 
+F           =       175 
+F_SH        =       185 
+G           =       196 
+G_SH        =       207 
+A           =       220 
+A_SH        =       233 
+H           =       247 
+
+; http://pages.mtu.edu/~suits/notefreqs.html
+
+; macro TVCFREQ
+;   (4096 - ( 195312.5 / %%1 ))
+; endm
+
+            .INCLUDE demo_tune_tvc.z80 
+
+            .INCLUDE demo_tune_sn.z80 
+
+            .INCLUDE demo_tune_saa.z80 
+
+            .INCLUDE demo_tune_ym.z80 
+
+
+U0_PLAYER_LOOP:      
+            LD      a,(hl) 
+            LD      b,a 
+            AND     $F0 
+            CP      00 
+            JP      z,TVC_PLAYER 
+            CP      $10 
+            JP      z,SN_PLAYER 
+            CP      $20 
+            JP      z,SAA_PLAYER 
+            CP      $30 
+            JP      z,YM_PLAYER 
+
+ALL_SEQ_DELAY:       
+            INC     hl 
+            LD      b,(hl) 
+            INC     hl 
+U0_ALL_DELAY_LOOP_1:  
+            LD      d,b 
+            LD      b,$ff 
+U0_ALL_DELAY_LOOP_2:  
+            NOP      
+            DJNZ    U0_ALL_DELAY_LOOP_2 
+
+            LD      b,d 
+            DJNZ    U0_ALL_DELAY_LOOP_1 
+            JP      U0_PLAYER_LOOP 
+
+DEMO_TVC_STR:        
+            .ISTR   "TVC internal sound...\r\n" 
+DEMO_SN_STR:         
+            .ISTR   "SN76489 sound...\r\n" 
+DEMO_SAA_STR:        
+            .ISTR   "SAA1099 sound...\r\n" 
+DEMO_SAA_SONG_STR:   
+            .ISTR   "SAA1099 music (Sean Bernard - Pop 'N' Twin Bee)...\r\n" 
+DEMO_YM_STR:         
+            .ISTR   "YM3812  music (Out Zone - Ending Theme)...\r\n" 
+

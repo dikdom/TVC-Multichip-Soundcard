@@ -1,0 +1,211 @@
+INIT_SCREEN:         
+
+; set 2-col resolution
+            LD      a,$00 
+            OUT     ($06),a 
+
+; white for characters
+            LD      a,$00 
+            OUT     ($60),a 
+            LD      a,$50 
+            OUT     ($61),a 
+            LD      a,$10 
+            OUT     ($62),a 
+            LD      a,$ff 
+            OUT     ($62),a 
+
+; U0-U1-VID-EXT
+            LD      a,$D0 
+            OUT     ($02),a 
+
+CLEAR_SCREEN:        
+; clear screen
+            LD      a,$00 
+            LD      ($8000),a 
+            LD      hl,$8000 
+            LD      de,$8001 
+            LD      bc,$3fff 
+            LDIR     
+
+; charpos is initialized to 0,0 (upper left)
+            LD      bc,0 
+            CALL    SET_POS 
+;            SCREENLOOP:
+;            JR      screenloop
+
+; restore original paging
+            RET      
+
+; X:b
+; Y:c
+SET_POS:             
+            PUSH    hl 
+            PUSH    af 
+
+; store screen position
+            LD      a,b 
+            LD      (CHARPOS_XY),a 
+            LD      a,c 
+            LD      (CHARPOS_XY+1),a 
+
+            LD      h,$80 
+            LD      l,b 
+
+            LD      a,c 
+            SLA     A 
+            ADD     a,h 
+            LD      h,a 
+
+; store screen address
+            LD      (CHARPOS_ADDR),hl 
+
+            POP     af 
+            POP     hl 
+            RET      
+
+PRINT_CHARACTER:     
+            PUSH    hl 
+            PUSH    de 
+            PUSH    bc 
+            PUSH    af 
+
+            AND     $7f 
+            CP      $0D 
+            JR      z,L_CHAR_CR 
+            CP      $0A 
+            JR      z,L_CHAR_LF 
+            CP      " "-1 
+            JR      c,L_NON_PRINTABLE 
+            CP      "?"+1 
+            JR      c,L_NUM_CHARS 
+            CP      "]"+1 
+            JR      c,L_CAP_CHARS 
+            CP      "z"+1 
+            JR      c,L_SMALL_CHARS 
+            JR      L_NON_PRINTABLE 
+L_NUM_CHARS:         
+
+            JR      L_COPY_CHAR 
+L_CAP_CHARS:         
+            SUB     $40 
+            JR      L_COPY_CHAR 
+L_SMALL_CHARS:       
+            SUB     $20 
+            JR      L_COPY_CHAR 
+
+L_COPY_CHAR:         
+            LD      l,a 
+            XOR     a 
+            LD      h,a 
+            SLA     l 
+            RL      h 
+            SLA     l 
+            RL      h 
+            SLA     l 
+            RL      h 
+            LD      bc,CHARSETADDR 
+            ADD     hl,bc 
+            LD      b,$08 
+            LD      de,(CHARPOS_ADDR) 
+
+L_CHAR_COPY_LOOP:    
+            LD      a,(hl) 
+            EX      de,hl 
+            LD      (hl),a 
+            EX      de,hl 
+            INC     hl 
+            LD      a,e 
+            ADD     a,$40 
+            LD      e,a 
+            LD      a,d 
+            ADC     a,0 
+            LD      d,a 
+            DJNZ    L_CHAR_COPY_LOOP 
+
+            LD      hl,CHARPOS_ADDR 
+            INC     (hl) 
+            LD      hl,CHARPOS_XY 
+            INC     (hl) 
+            JR      L_PRINT_CHAR_DONE 
+
+L_CHAR_CR:           
+            LD      a,(CHARPOS_XY+1) 
+            LD      c,a 
+            XOR     a 
+            LD      b,a 
+            CALL    set_pos 
+            JR      L_PRINT_CHAR_DONE 
+L_CHAR_LF:           
+            LD      a,(CHARPOS_XY) 
+            LD      b,a 
+            LD      a,(CHARPOS_XY+1) 
+            INC     a 
+            CP      30 
+            JR      nz,no_scroll 
+            CALL    scroll_screen 
+            DEC     a 
+NO_SCROLL:           
+            LD      c,a 
+            CALL    set_pos 
+L_NON_PRINTABLE:     
+L_PRINT_CHAR_DONE:   
+
+            POP     af 
+            POP     bc 
+            POP     de 
+            POP     hl 
+            RET      
+
+SCROLL_SCREEN:       
+            PUSH    hl 
+            PUSH    de 
+            PUSH    bc 
+            LD      de,$8000 
+            LD      hl,$8000+512 
+            LD      bc,$4000-512 
+            LDIR     
+            POP     bc 
+            POP     de 
+            POP     hl 
+
+            RET      
+
+
+PRINT_ISTRING:       
+            PUSH    af 
+PRNT_ISRT_LOOP:      
+            LD      a,(hl) 
+
+            CALL    PRINT_CHARACTER 
+
+            BIT     7,a 
+            JR      nz,PRINT_DONE 
+            INC     hl 
+            JR      PRNT_ISRT_LOOP 
+
+PRINT_DONE:          
+            POP     af 
+            RET      
+PRINT_NUM1:          
+            CP      $0a 
+            JR      nc,PRINT_HEX_CHAR 
+            ADD     a,"0" 
+            CALL    PRINT_CHARACTER 
+            RET      
+PRINT_HEX_CHAR:      
+            ADD     a,"A"-10 
+            CALL    PRINT_CHARACTER 
+            RET      
+
+PRINT_NUM2:          
+            PUSH    af 
+            SRL     a 
+            SRL     a 
+            SRL     a 
+            SRL     a 
+            CALL    PRINT_NUM1 
+            POP     AF 
+            AND     $0F 
+            CALL    PRINT_NUM1 
+            RET      
+

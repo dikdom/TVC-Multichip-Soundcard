@@ -1,0 +1,239 @@
+;----------------------------------------------
+;
+; SNDMgc test program, SAA1099 test, based on
+; Miklós Hanák work
+;
+;
+; SAA1099P test program for TVC
+; 2013 RetroHW
+;
+; Source:
+;        http://sdinterface.atw.hu (TVC demo)
+;        http://wwww.micklab.narod.ru (ETunes)
+;        http://www.keprt.cz (Songs)
+;----------------------------------------------
+
+;
+; SAA1099 Address port is $n3, where n is the slot (1-4) the card is. Example $13
+; SAA1099 Data port is $n2, where n is the slot (1-4) the card is. Example $12
+;
+
+SAAADDRPORT = $43
+SAADATAPORT = SAAADDRPORT-1
+
+
+.binfrom PROGRAM_START
+.binto PROGRAM_END
+
+
+.org (6639 - $90)
+PROGRAM_START:
+.include CASheader.bin
+
+.org 6639
+	.db	0FH,0AH,0,0DDH
+	.db	" USR"
+	.db	96H,"6659"
+	.db	95H,0FFH,0,0,0,0,0	; 20 byte program header
+;
+prog:
+    jp	pmain			; program start
+;
+psave:
+    .db	070h			; P_SAVE saved value (mem paging during program start)
+xitflag:
+    .db	0
+SAABASEADDR:
+    .db 0
+
+;----------------------------------------------
+;----------------- MAINPROGRAM -----------------
+;----------------------------------------------
+pmain:	exx				; mainprogram
+	push	bc
+	push	de
+	push	hl
+	exx
+	ld	a,(00003h)		; A reg.= P_SAVE (actual memorypaging)
+	ld	(psave),a		; save into our own variable
+;
+	ld	c,000h			; VMODE graphics mode: 0-2 colors 1-four 2-sixteen colors
+	rst	30h
+	.db	4
+	ld	hl,introtxt		; print intro text
+	call	ut_prnt
+
+    
+	ld	c,SAAADDRPORT
+	ld	b,28
+	out	(c),b
+	ld	c,SAADATAPORT
+	ld	b,1
+	out	(c),b                   ;Enabling SAA
+
+	ld	c,3
+	ld	b,2
+	out	(c),b
+	ld      hl,songdata
+    ld	(EPlayerInit+1),hl            ; Passing the song title
+
+    call	EPlayerInit			; initializing the player
+
+	call	intat                         ; Setting up interrupt
+task:
+        di
+	ld	c,058H
+	in	a,(c)
+	xor	10111111b			; Exit on pressing 'Q'
+	jp	z,exit
+	ei
+	jp task
+
+exit:
+	call	intvissza                     ; reset interrupt
+
+	ld	c,SAAADDRPORT
+	ld	b,28
+	out	(c),b
+	ld	c,SAADATAPORT
+	ld	b,0
+	out	(c),b                   ; Disabling SAA
+
+	rst	30h
+	.db	5			; CLS
+
+	ld	a,(psave)		; Saved P_SAVE into register A
+	ld	(0003h),a		; restoring original memory paging
+	out	(002h),a
+	exx
+	pop	hl
+	pop	de
+	pop	bc
+	exx
+	ret
+;----------------------------------------------
+;----------------- The End --------------------
+;----------------------------------------------
+
+;------------Interrupt handler-----------------
+; átírás saját megszakításkezelõ alprogramra
+
+intat:
+
+	di				; megszak. tilt
+	ld	a,(0B12h)		; A reg.= Port5 tükörképe
+	res	5,a			; hang IT tiltva
+	res	4,a			; hangjel is tiltva
+	ld	(0B12h),a		; új érték a memóriába
+	out	(005h),a		; és a portra
+
+	ld	a,00Ah			; CRTC R10-es regiszterében a kurzor engedélyezése
+	out	(070h),a
+	ld	a,003h
+	out	(071h),a
+	ld	a,0C3h			; A reg.= JP XXXX kódja
+	ld	(0038h),a		; megszakításrutin elsõ bájtjának átírása
+	ld	hl,sajatint
+	ld	(0039h),hl		; ugróutasítás célcím beírása
+	ei				; megszak. eng.
+	ret
+
+intvissza:
+	di				; megszak. tilt
+	ld	hl,L1D2F		; HL= eredeti megszak. rutin visszaállítandó kódrészlete
+	ld	de,0038h		; DE= megszak. címe
+	ld	bc,0003h		; BC= 3 bájt lesz
+	ldir				; bájtok másolása
+	ld	a,(0B12h)		; A reg.= Port5 tükörképe
+	res	5,a			; hang IT tiltva
+	res	4,a			; hangjel is tiltva
+	ld	(0B12h),a		; új érték a memóriába
+	out	(005h),a		; és a portra
+	ld	a,00Ah			; CRTC R10-es regiszterében a kurzor engedélyezése
+	out	(070h),a
+	ld	a,003h
+	out	(071h),a
+	ei				; megszak. eng.
+	ret
+;
+;	Eredeti megszak. rutin visszaállítandó kódrészlete
+;
+L1D2F:	push	af
+	ld	a,070h
+
+;
+;
+;	Saját megszakítás-kiszolgáló rutin
+;
+sajatint:
+	di				; további megszak. tilt
+	push	af			; A reg. mentése
+	ld	a,090h			; memórialapozás: U0,U1,VID,U3
+	out	(002h),a		; memórialapozás beállítása
+	out	(007h),a		; kurzor/hang megszak. kérés törlése
+
+		push	hl
+		push	bc
+		push	de
+		push	af
+
+		call	EPlayerPlay
+
+		pop	af
+		pop	de
+		pop	bc
+		pop	hl
+
+	ld	a,(0003h)		; eredeti memórialapozás vissza
+	out	(002h),a
+	pop	af			; A reg. vissza
+	ei				; megszak. eng
+	ret				; visszatérés
+
+;------------------------
+;szubrutinok vége
+
+;----------------------------------------------
+;----------------- függvények -----------------
+;----------------------------------------------
+
+;----------------------------------------------
+;	Szöveg kiírása az aktuális vagy adott xy pozícióba
+;	in:  B  - X poz. ('ut_prn0'-nál belépve)
+;	     C  - Y poz. ('ut_prn0'-nál belépve)
+;	     HL - 0-val lezárt string kezdete
+;	out: HL - a lezáró nulla utáni cím
+;
+
+ut_prnt:ld	bc,0000h		; aktuális pozícióba ír
+ut_prn0:rst	30h			; kurzor-pozicionálás
+	.db	023h			; CPOS
+ut_prn1:ld	a,(hl)
+	inc	hl
+	or	a
+	ret	z
+	ld	c,a
+	rst	30h			; karakter kiírása
+	.db	021h			; ED_CHOUT
+	jr	ut_prn1
+
+
+;----------------------------------------------
+;----------------------------------------------
+;----------------------------------------------
+
+introtxt:
+	.db	"SAA1099P teszt program TVC-re\r\n\r\n"
+	.db	"Kil\u0091p\u0091s Q billenty\u0098 megnyom\u0090s\u0090val...\r\n\r\n"
+	.db	"\r\n\r\nSanxion.etc\r\n\r\n\r\n\r\n2013 RetroHW\r\n"
+	.db	"\r\n\u0000"
+
+songdata:
+;.include enola.dat
+.incbin "Roger Hartley - Sanxion.etc"
+
+.include  etplayer.z80
+
+PROGRAM_END:
+
+.end 

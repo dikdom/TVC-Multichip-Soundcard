@@ -1,0 +1,51 @@
+.cpu Z80
+
+
+;00 	filetype 	fájl típus, 01h/11h: pufferelt/nem pufferelt
+;01 	copyprotect 	ha 00h akkor nem védett a fájl
+;02-03 	blocknumber lo/hi 	A program által elfoglalt 80h méretű blokkok száma
+;04 	lastblockbytes 	Az utolsó 80h-s blokkban található hasznos bájtok száma (0-127)
+;05-7F 	00h 	Mindig 00h
+;Nem pufferelt file-ok 16-bájtos fejléce
+;80 	00h 	Mindig 00h
+;81 	type 	01 - programfájl, 00 - adat
+;82-83 	prgsize lo/hi 	a program hossza
+;84 	autorun 	automatikus indítás, ha $ff akkor igen
+;85-8E 	00h 	Mindig 00h
+;8F 	versionnumber 	Változatszám (többnyire nem használják)
+;90-n 	databytes 	A program adatbájtjai, egészen a fájl végéig.
+
+
+; fileType - $01 buffered, $11 non-buffered
+.db $11
+
+; copyprotect - $00 no protection
+.db $00
+
+; number of blocks, lo-hi order. Program size in $80 sized blocks
+.db lsb((PROGRAM_END - PROGRAM_START - 1) / $80)
+.db msb((PROGRAM_END - PROGRAM_START - 1) / $80)
+
+; lastblock bytes (0-$7f)
+.db (PROGRAM_END - PROGRAM_START) % $80
+
+; filled with zeroes
+bsz ($80-$05)
+
+; always $00
+.db $00
+
+; type of file: 01h program file, $00 data file
+.db $01
+
+; program size in bytes lo/hi order
+.db lsb(PROGRAM_END - PROGRAM_START)
+.db msb(PROGRAM_END - PROGRAM_START)
+
+; autorun if $ff
+.db $00
+
+; always $00
+bsz ($90-$85)
+
+

@@ -1,0 +1,675 @@
+;--------------------------------------------------------------------
+; Ž¯¨á ­¨¥: à®¨£àë¢ îé¨© ¬®¤ã«ì ¬ã§ëª «ì­®£® à¥¤ ªâ®à  E-Tracker
+; ¯®àâ¨à®¢ ­  á ª®¬¯ìîâ¥à  Sam Coupe
+; €¢â®à ¯®àâ : ’ à á®¢ Œ..(Mick),2010
+;--------------------------------------------------------------------
+;-------------------------------------------------------------------
+; ®¯¨á ­¨¥: ˆ­¨æ¨ «¨§ æ¨ï ¯à®¨£àë¢ â¥«ï
+; ¯ à ¬¥âàë: ­¥â
+; ¢®§¢à é ¥¬®¥  §­ ç¥­¨¥: ­¥â
+;---------------------------------------------------------------------
+
+EPlayerInit:
+		ld	hl,0           			; ¤à¥á ¬ã§ëª¨
+		jp	loc083EC                      ;¯¥à¥å®¤ ­  ¨­¨æ¨ «¨§ æ¨î ¯à®¨£àë¢ â¥«ï
+;-------------------------------------------------------------------
+; ®¯¨á ­¨¥: à®¨£àë¢ ­¨¥ â¥ªãé¥© ­®âë
+; ¯ à ¬¥âàë: ­¥â
+; ¢®§¢à é ¥¬®¥  §­ ç¥­¨¥: ­¥â
+;---------------------------------------------------------------------
+EPlayerPlay:
+		ld	a,1				;â¥ªãé¨© ª ­ «
+		dec	a
+		jr	nz,loc0802A                  ;¢ë¢¥«¨ ¨­ä®à¬ æ¨î ¢® ¢á¥ ª ­ «ë?
+		ld	ix,word0833A                 ;¤ ,¯¥à¥å®¤¨¬ ª ¯®¤£®â®¢ª¨ ­®¢ëå §­ ç¥­¨©
+		ld	b,6                            ;ç¨á«® ª ­ «®¢
+
+loc08011:
+		push	bc
+		call	sub081A4
+		ld	bc,19h                         ;ª®«¨ç¥áâ¢® ¡ ©â ¤«ï ®¤­®£® ª ­ « 
+		add	ix,bc
+		pop	bc
+		djnz	loc08011
+		ld	hl,(word083EA)
+		ld	a,h
+		call	sub08157
+		or	l
+		ld	(loc080E5+1),a
+
+loc08028:
+		ld	a,6                           ;ãáâ ­®¢¨¬ â¥ªãé¨© ª ­ « ¤«ï ®¡­®¢«¥­¨ï
+
+loc0802A:
+		ld	(EPlayerPlay+1),a              ;ãáâ ­®¢¨¬ ­®¢®¥ §­ ç¥­¨¥ â¥ªãé¥£® ª ­ « 
+		ld	ix,word0833A                
+		call	sub0826A
+		ld	(EAmplitudech0),a               ;Amplitude 0 right/left
+		ld	(EFrequencych0),hl
+		push	hl
+		ld	hl,0
+		call	sub0815C
+		ld	(loc08055+1),hl
+		ld	(loc080E3+1),a
+		ld	ix,word08353
+		call	sub0826A
+		ld	(EAmplitudech1),a               ;Amplitude 1 right/left
+		ld	(EFrequencych0+1),hl
+		push	hl
+
+loc08055:
+		ld	hl,0
+		call	sub0815C
+		ld	(loc08073+1),hl
+		rl	h
+		jr	nc,loc08065
+		ld	(loc080E3+1),a
+
+loc08065:
+		ld	ix,word0836C
+		call	sub0826A
+		ld	(EAmplitudech2),a		;Amplitude 2 right/left
+		ld	(EFrequencych2),hl
+		push	hl
+
+loc08073:
+		ld	hl,0
+		call	sub0815C
+		ld	(loc08091+1),hl
+		rl	h
+		jr	nc,loc08083
+		ld	(loc080E3+1),a
+
+loc08083:
+		ld	ix,word08385
+		call	sub0826A
+		ld	(EAmplitudech3),a		;Amplitude 3 right/left
+		ld	(EFrequencych2+1),hl
+		push	hl
+
+loc08091:
+		ld	hl,0
+		call	sub0815C
+		ld	(loc080AB+1),hl
+		ld	(loc080DD+1),a
+
+		ld	ix,word0839E
+		call	sub0826A
+		ld	(EAmplitudech4),a		;Amplitude 4 right/left
+		ld	(EFrequencych4),hl
+		push	hl
+
+loc080AB:
+		ld	hl,0
+		call	sub0815C
+		ld	(loc080C9+1),hl
+		rl	h
+		jr	nc,loc080BB
+		ld	(loc080DD+1),a
+
+loc080BB:
+		ld	ix,word083B7
+		call	sub0826A
+		ld	(EAmplitudech5),a                ;Amplitude 5 right/left
+		ld	(EFrequencych4+1),hl
+		push	hl
+
+loc080C9:
+		ld	hl,0
+		call	sub0815C
+		rr	l
+		rr	l
+		rr	h
+		rr	h
+		ld	(EFrequencyen),hl               ;Freqency and Noise enable
+		rlca	
+		jr	c,loc080E0
+
+loc080DD:
+		ld	a,0
+		rlca	
+
+loc080E0:
+		rlca	
+		rlca	
+		rlca	
+
+loc080E3:
+		or	0
+
+loc080E5:
+		or	0
+		ld	(ENoisegen),a			;Noise generator 0 and 1
+		pop	af
+		pop	bc
+		call	sub08157
+		or	b
+		ld	h,a
+		pop	af
+		pop	bc
+		call	sub08157
+		or	b
+		ld	l,a
+		ld	(EOctavech2),hl		;Octave 2 and 3 and 4 and 5
+		pop	af
+		pop	bc
+		call	sub08157
+		or	b
+		ld	(EOctavech0),a                ;Octave 1 and 0
+
+		ld a,(FC_PORT)
+		add a,3
+		ld c,a
+		ld b,0
+;		ld	bc,SAAADDRPORT
+		ld	de,1C01h                       ;à¥£¨áâà 1‘h,¡¨â SE=1
+		out	(c),d
+		dec	c
+		out	(c),e                          ;à §à¥è¨âì ¢á¥ ª ­ «ë
+		ld	hl,EEnvelopegen1              ;â ¡«¨æ  ¤ ­­ëå §¢ãª®¢®£® ª ­ « 
+		ld	d,19h                          ;à §¬¥à ¤ ­­ëå ¤«ï ®¤­®£® ª ­ « 
+
+loc08114:
+		inc	c
+		out	(c),d                          ;§ £àã¦ ¥¬ ­®¬¥à à¥£¨áâà 
+		dec	c
+		ld	a,(hl)                         ;ç¨â ¥¬ §­ ç¥­¨¥ ¨§ â ¡«¨æë
+		out	(c),a                          ;¢ë¢®¤¨¬ ¢ ¯®àâ
+		dec	d                               ;á«¥¤ãîé¨© ¡ ©â
+		ret	m                               ;¢ëå®¤ ¯® ®ª®­ç ­¨¨ § ¯¨á¨
+		dec	hl                              ;¯¥à¥å®¤¨¬ ª á«¥¤ãîé¨¬ §­ ç¥­¨ï¬
+		jr	loc08114                      ;¯à®¤®«¦¨¬ § ¯¨áì ¢ ¯®àâ
+
+		.db    5
+		.db  21h
+		.db  3Ch
+		.db  55h
+		.db  6Dh
+		.db  84h
+		.db  99h
+		.db 0ADh
+		.db 0C0h
+		.db 0D2h
+		.db 0E3h
+		.db 0F3h
+unk0812C:	.db 0FEh
+		.db    1
+		.db    0
+		.db    0
+		.db 0FCh
+unk08131:	.db    0
+		.db  96h
+		.db  9Eh
+		.db  9Ah
+		.db  86h
+		.db  8Eh
+		.db  8Ah
+		.db  97h
+		.db  9Fh
+		.db  9Bh
+		.db  87h
+		.db  8Fh
+		.db  8Bh
+unk0813E:	.db 0FEh
+		.db    0
+unk08140:	.db 0FFh
+		.db 0D2h
+		.db  57h
+		.db  72h
+		.db    0
+		.db  52h
+		.db 0ABh
+		.db  51h
+		.db  61h
+		.db  50h
+		.db  52h
+		.db  30h
+		.db 0C2h
+		.db  2Eh
+		.db  35h
+		.db  21h
+		.db  29h
+		.db  11h
+		.db  41h
+		.db  0Fh
+		.db  46h
+		.db    0
+		.db  3Ah
+
+
+sub08157:
+		rlca
+		rlca
+		rlca
+		rlca
+		ret
+
+sub0815C:
+		ex	af,af'
+		rrca	
+		rr	l
+		rrca	
+		rr	h
+		ret	
+
+sub08164:
+		sla	c
+		ld	b,0
+		add	hl,bc
+
+sub08169:
+		ld	c,(hl)				;ç¨â ¥¬  ¬« ¤è¨© ¡ ©â  ¤à¥á  á¬¥é¥­¨ï
+		inc	hl
+		ld	b,(hl)                         ;ç¨â ¥¬ áâ àè¨© ¡ ©â  ¤à¥á  á¬¥é¥­¨ï
+		inc	hl                              ;¯¥à¥å®¤¨¬ ª á«¥¤ãîé¥¬ã  ¤à¥áã
+		push	hl
+
+loc0816E:
+		ld	hl,0                           ; ¤à¥á ¬ã§ëª¨
+		add	hl,bc                          ;¯®«ãç¨¬  ¤à¥á â ¡«¨æë
+		ld	c,l                            ;¬« ¤è¨© ¡ ©â  ¤à¥á 
+		ld	b,h                            ;áâ àè¨© ¡ ©â  ¤à¥á 
+		pop	hl
+		ret	
+
+loc08176:
+		ld	hl,0
+		call	sub08164
+		ld	(ix+0Fh),c
+		ld	(ix+10h),b
+		ld	hl,unk0812C
+		ld	(ix+4),l
+		ld	(ix+5),h
+		jr	loc081D4
+loc0818D:
+		ld	hl,0
+		call	sub08164
+		ld	(ix+11h),c
+		ld	(ix+12h),b
+		ld	hl,unk0813E
+		ld	(ix+8),l
+		ld	(ix+9),h
+		jr	loc081E0
+sub081A4:
+		dec	(ix+13h)
+		ret	p
+		ld	a,b
+		cp	3
+		ld	hl,EEnvelopegen0
+		jr	nc,loc081B1
+		inc	hl
+loc081B1:
+		ld	(loc081FB+1),hl
+loc081B4:
+		ld	e,(ix+0)
+		ld	d,(ix+1)
+loc081BA:
+		ld	hl,unk08140
+loc081BD:
+		ld	a,(de)
+		inc	hl
+		sub	(hl)
+		inc	hl
+		jr	c,loc081BD
+		inc	de
+		ld	c,a
+		ld	a,(hl)
+		ld	(loc081C9+1),a
+loc081C9:
+		jr	loc081C9
+loc081CB:
+		ld	(ix+0Eh),c
+		ld	c,(ix+0Fh)
+		ld	b,(ix+10h)
+loc081D4:
+		ld	(ix+2),c
+		ld	(ix+3),b
+		ld	c,(ix+11h)
+		ld	b,(ix+12h)
+loc081E0:
+		ld	(ix+6),c
+		ld	(ix+7),b
+		ld	(ix+14h),1
+		ld	(ix+15h),1
+		ld	(ix+16h),1
+		jr	loc081BA
+loc081F4:
+		ld	b,0
+		ld	hl,unk08131
+		add	hl,bc
+		ld	a,(hl)
+loc081FB:
+		ld	(0),a
+		jr	loc081BA
+loc08200:
+		ld	(ix+17h),c
+		jr	loc081BA
+loc08205:
+		ld	a,c
+		inc	a
+		ld	(loc08028+1),a
+		jr	loc081BA
+loc0820C:
+		ld	(ix+18h),c
+		jr	loc081BA
+loc08211:
+		jr	z,loc08215
+		ld	c,3
+loc08215:
+		ld	hl,(loc081FB+1)
+		inc	hl
+		inc	hl
+		ld	(hl),c
+		jr	loc081BA
+loc0821D:
+		ld	bc,unk0812C
+		jr	loc081D4
+loc08222:
+		ld	(ix+13h),c
+		ld	(ix+0),e
+		ld	(ix+1),d
+		ret	
+loc0822C:
+		call	sub08461
+		jp	loc081B4
+loc08232:
+		cp	7Fh ; ''
+		jr	z,loc0823F
+		cp	7Eh ; '~'
+		jr	z,loc08247
+		add	a,2
+		ld	c,a
+		jr	loc0827D
+loc0823F:
+		ld	(ix+4),l
+		ld	(ix+5),h
+		jr	loc0827D
+loc08247:
+		ld	l,(ix+4)
+		ld	h,(ix+5)
+		jr	loc0827D
+loc0824F:
+		inc	a
+		jr	z,loc0825A
+		inc	a
+		jr	z,loc08262
+		sub	60h ; '`'
+		ld	c,a
+		jr	loc0829F
+loc0825A:
+		ld	l,(ix+8)
+		ld	h,(ix+9)
+		jr	loc0829F
+loc08262:
+		ld	(ix+8),l
+		ld	(ix+9),h
+		jr	loc0829F
+sub0826A:
+		ld	e,(ix+0Ah)
+		ld	d,(ix+0Bh)
+		dec	(ix+15h)
+		ld	l,(ix+2)
+		ld	h,(ix+3)
+		jr	nz,loc0828E
+		ld	c,1
+loc0827D:
+		ld	a,(hl)
+		inc	hl
+		rrca	
+		jr	nc,loc08232
+		ld	(ix+15h),c
+		ld	(ix+0Bh),a
+		ld	e,(hl)
+		ld	d,a
+		ld	(ix+0Ah),e
+		inc	hl
+loc0828E:
+		push	hl
+		ld	a,(ix+0Dh)
+		dec	(ix+14h)
+		jr	nz,loc082B1
+		ld	c,1
+		ld	l,(ix+6)
+		ld	h,(ix+7)
+loc0829F:
+		ld	a,(hl)
+		inc	hl
+		cp	60h ; '`'
+		jr	nc,loc0824F
+		ld	(ix+14h),c
+		ld	(ix+0Dh),a
+		ld	(ix+6),l
+		ld	(ix+7),h
+loc082B1:
+		add	a,(ix+0Eh)
+		cp	5Fh ; ''
+		ld	hl,7FFh
+		jr	z,loc082D1
+loc082BB:
+		add	a,0
+		jr	nc,loc082C1
+		sub	60h ; '`'
+loc082C1:
+		ld	hl,0FF0Ch
+		ld	b,h
+loc082C5:
+		inc	h
+		sub	l
+		jr	nc,loc082C5
+		ld	c,a
+		ld	a,h
+		ld	hl,unk0812C
+		add	hl,bc
+		ld	l,(hl)
+		ld	h,a
+loc082D1:
+		add	hl,de
+		ld	a,h
+		and	7
+		ld	h,a
+		ld	a,d
+		rrca	
+		rrca	
+		rrca	
+		and	0Fh
+		ex	af,af'
+		ex	de,hl
+		pop	hl
+		ld	a,(ix+0Ch)
+		dec	(ix+16h)
+		jr	nz,loc082F4
+		ld	a,(hl)
+		inc	hl
+loc082E9:
+		cp	0
+		jr	nz,loc08322
+		ld	c,(hl)
+		inc	hl
+loc082EF:
+		ld	a,(hl)
+		inc	hl
+loc082F1:
+		ld	(ix+16h),c
+loc082F4:
+		ld	(ix+2),l
+		ld	(ix+3),h
+		ld	(ix+0Ch),a
+		ex	de,hl
+		ld	b,(ix+18h)
+		ld	c,a
+		and	0Fh
+		sub	b
+		jr	nc,loc08308
+		xor	a
+loc08308:
+		ld	e,a
+		ld	a,c
+		and	0F0h ; 'ð'
+		call	sub08157
+		sub	b
+		jr	nc,loc08313
+		xor	a
+loc08313:
+		ld	d,a
+		ld	a,(ix+17h)
+		or	a
+		ld	a,e
+		jr	nz,loc0831D
+		ld	a,d
+		ld	d,e
+loc0831D:
+		call	sub08157
+		or	d
+		ret	
+loc08322:
+		push	hl
+		ld	b,a
+loc08324:
+		ld	hl,0
+loc08327:
+		ld	a,(hl)
+		or	a
+		jr	z,loc08334
+		inc	hl
+		ld	c,(hl)
+		inc	hl
+		cp	b
+		jr	nz,loc08327
+		pop	hl
+		jr	loc082EF
+loc08334:
+		pop	hl
+		ld	c,1
+		ld	a,b
+		jr	loc082F1
+word0833A:	
+		ds	25
+word08353:
+		ds	25
+word0836C:
+		ds	25
+word08385:
+		ds	25
+word0839E:
+		ds	25
+word083B7:
+		ds	25
+
+EAmplitudech0:	.db 	0				;+00h - Amplitude 0 right/left
+EAmplitudech1:	.db 	0                               ;+01h - Amplitude 1 right/left
+EAmplitudech2:	.db 	0                               ;+02h - Amplitude 2 right/left
+EAmplitudech3:	.db 	0                               ;+03h - Amplitude 3 right/left
+EAmplitudech4:	.db 	0                               ;+04h - Amplitude 4 right/left
+EAmplitudech5:	.db 	0                               ;+05h - Amplitude 5 right/left
+		.db    	0                              	;+06h - XXXX
+		.db    	0                              	;+07h - XXXX
+EFrequencych0:	.db 	0                               ;+08h - Frequency of tone 0
+		.db	0                               ;+09h - Frequency of tone 1
+EFrequencych2:	.db 	0				;+0Ah - Frequency of tone 2
+		.db	0                               ;+0Bh - Frequency of tone 3
+EFrequencych4:	.db 	0                               ;+0Ch - Frequency of tone 4
+		.db	0                               ;+0Dh - Frequency of tone 5
+		.db    	0                              	;+OEh - XXXX
+		.db    	0                              	;+0Fh - XXXX
+EOctavech0:	.db 	0                               ;+10h - Octave 1 and 0
+EOctavech2:	.db 	0                               ;+11h - Octave 3 and 2
+		.db	0                               ;+12h - Octave 5 and 4
+		.db    	0                               ;+13h - XXXX
+EFrequencyen:	.db 	0                               ;+14h - Frequency enable
+		.db	0                               ;+15h - Noise enable
+ENoisegen:	.db 	0                               ;+16h - Noise generator 0 and 1
+		.db    	0 	                        ;+17h - XXXX
+EEnvelopegen0:	.db    	0                               ;+18h - Envelope generator 0
+EEnvelopegen1:	.db    	0                               ;+19h - Envelope generator 1
+
+word083EA:	.dw 	0
+
+loc083EC:
+		ld	(loc0816E+1),hl		;á®åà ­¨¬  ¤à¥á ¬ã§ëª¨
+		call	sub08169                      ;¯®«ãç¨¬  ¤à¥á 1 â ¡«¨æë
+		ld	(sub08461+1),bc               ;á®åà ­¨¬  ¤à¥á
+		call	sub08169                      ;¯®«ãç¨¬  ¤à¥á 2 â ¡«¨æë
+		ld	(loc08476+1),bc               ;á®åà ­¨¬  ¤à¥á
+		call	sub08169                      ;¯®«ãç¨¬  ¤à¥á 3 â ¡«¨æë
+		ld	(loc08176+1),bc               ;á®åà ­¨¬  ¤à¥á
+		call	sub08169                      ;¯®«ãç¨¬  ¤à¥á 4 â ¡«¨æë
+		ld	(loc0818D+1),bc               ;á®åà ­¨¬  ¤à¥á
+		call	sub08169                      ;¯®«ãç¨¬  ¤à¥á 5 â ¡«¨æë
+		ld	a,(bc)
+		inc	bc
+		ld	(loc082E9+1),a                ;á®åà ­¨¬  ¤à¥á
+		ld	(loc08324+1),bc
+		ld	hl,word0833A                  ;­ ç «ì­ë©  ¤à¥á á«ã¦¥¡­ëå ¤ ­­ëå
+		ld	b,0B2h                          ;à §¬¥à ®¡« áâ¨ á«ã¦¥¡­ëå ¤ ­­ëå
+		xor	a                               ;¡ ©â § ¯®«­¥­¨ï - 00h
+loc0841D:
+		ld	(hl),a                          ;®ç¨é ¥¬ á«ã¦¥¡­ãî ®¡« áâì
+		inc	hl
+		djnz	loc0841D
+		inc	a
+		ld	(EPlayerPlay+1),a               ;ãáâ ­®¢¨¬ ­®¬¥à â¥ªãé¥£® ª ­ «  - 01h
+		ld	ix,word0833A                 ; ¤à¥á á«ã¦¥¡­ëå ¤ ­­ëå 1 ª ­ « 
+		ld	de,19h                         ;à §¬¥à ¤ ­­ëå ¤«ï ®¤­®£® ª ­ « 
+		ld	b,6
+loc0842E:
+		ld	(ix+14h),1
+		ld	(ix+15h),1
+		ld	(ix+16h),1
+		ld	hl,unk0812C
+		ld	(ix+0Fh),l
+		ld	(ix+10h),h
+		ld	(ix+2),l
+		ld	(ix+3),h
+		ld	hl,unk0813E
+		ld	(ix+11h),l
+		ld	(ix+12h),h
+		add	ix,de  				;¯¥à¥å®¤¨¬ ª á«¥¤ãîé¥¬ã ª ­ «ã
+		djnz	loc0842E
+		ld	de,1C02h			;à¥£¨áâà 1‘h SAA1099 - ¢ëª«îç¨¬ §¢ãª
+		ld a,(FC_PORT)
+		add a,3
+		ld c,a
+		ld b,0
+;		ld	bc,SAAADDRPORT
+		out	(c),d
+		dec	c
+		out	(c),e                          ;¨­¨æâ «¨§ æ¨ï ¬¨ªà®áå¥¬ë
+sub08461:
+		ld	hl,0				; ¤à¥á 1 â ¡«¨æë
+loc08464:
+		ld	c,(hl)
+		ld	a,c
+		inc	hl
+		inc	a
+		jr	z,loc084A4
+		inc	a
+		jr	z,loc084A9
+		sub	62h ; 'b'
+		jr	nc,loc084AE
+		ld	(sub08461+1),hl
+		sla	c
+loc08476:
+		ld	hl,0
+		call	sub08164
+		ld	(word0833A),bc
+		call	sub08169
+		ld	(word08353),bc
+		call	sub08169
+		ld	(word0836C),bc
+		call	sub08169
+		ld	(word08385),bc
+		call	sub08169
+		ld	(word0839E),bc
+		call	sub08169
+		ld	(word083B7),bc
+		ret	
+loc084A4:
+		ld	hl,0
+		jr	loc08464
+loc084A9:
+		ld	(loc084A4+1),hl
+		jr	loc08464
+loc084AE:
+		ld	(loc082BB+1),a
+		jr	loc08464
+;		.end

@@ -1,0 +1,296 @@
+;                      - MUSIC -
+; Chromatic scales are possible using the table below. Please note also,
+; that the tone numbers are also valid for the other octaves of the same
+; note although tuning may be difficult towards the lower octaves.
+; 
+;               - THE CHROMATIC SCALE
+; NB: All numbers given in decimal.
+; Note      Tone    Octave  Required    Actual
+;           Number  Number  Frequency   Frequency
+;             (decimal)     (Hz)        (Hz)
+; Middle C  33      03      261.626     261.506
+; C#        60      03      277.183     277.162
+; D         85      03      293,665     293.427
+; D#        109     03      311.127     310.945
+; E         132     03      329.628     329.815
+; F         153     03      349.228     349.162
+; F#        173     03      369.994     369.B22
+; G         192     03      391.995     391.850
+; G#        210     03      415.305     415.282
+; A         227     03      440.000     440.141
+; A#        243     03      466.164     466.418
+; B         5       04      493.883     494.071
+; C         33      04      523.251     523.013
+
+
+
+U0_DEMO_SAA:         
+
+SAA_CODE_SND =      $20 
+SAA_CODE_DEL =      $21 
+SAA_CODE_VOL =      $22 
+SAA_CODE_END =      $23 
+
+
+            LD      a,(PROTO_BOARD) 
+            CP      $00 
+            JP      z,SAA_DEMO_NO_BANKSWITCH 
+            LD      hl,DEMO_SAA_SONG_STR 
+            CALL    PRINT_ISTRING 
+            LD      hl,SAA_DEMO_SONG_PLAY 
+            CALL    CALL_ON_BANK_2 
+            RET      
+
+
+SAA_DEMO_NO_BANKSWITCH:  
+            LD      hl,DEMO_SAA_STR 
+            CALL    PRINT_ISTRING 
+
+            LD      a,(FC_PORT) 
+            ADD     a,2 
+            LD      c,a 
+            CALL    SAA_PLAYER_INIT 
+            LD      hl,SAA_SEQUENCE 
+            CALL    U0_PLAYER_LOOP 
+            RET      
+
+SAA_PLAYER_INIT:     
+
+            INC     c ; Reset frequency, disable sounds
+            LD      a,$1C 
+            OUT     (C),a 
+            DEC     c 
+            LD      a,$02 
+            OUT     (C),a 
+
+            INC     c ; disable all noise
+            LD      a,$15 
+            OUT     (C),a 
+            DEC     c 
+            XOR     a 
+            OUT     (C),a 
+
+            INC     c ; disable all voice
+            LD      a,$14 
+            OUT     (C),a 
+            DEC     c 
+            XOR     a 
+            OUT     (C),a 
+
+            INC     c ; disable envelope #0
+            LD      a,$18 
+            OUT     (C),a 
+            DEC     c 
+            XOR     a ; bit 7 is reset
+            OUT     (C),a 
+
+            INC     c ; disable envelope #1
+            LD      a,$19 
+            OUT     (C),a 
+            DEC     c 
+            XOR     a ; bit 7 is reset
+            OUT     (C),a 
+
+; set octave to #2 (122 - 244) for all channels
+            LD      b,$03 
+            LD      d,$0F 
+SAA_INIT_OCTAVE_LOOP:  
+            INC     c 
+            LD      a,d 
+            ADD     a,b 
+            OUT     (c),a 
+            LD      a,00100010b 
+            DEC     c 
+            OUT     (c),a 
+            DEC     b 
+            JR      nz,SAA_INIT_OCTAVE_LOOP 
+
+
+            INC     c ; no freq reset, enable sound
+            LD      a,$1C 
+            OUT     (C),a 
+            DEC     c 
+            LD      a,$01 
+            OUT     (C),a 
+
+            RET      
+
+SAA_PLAYER:          
+            LD      a,b 
+            CP      SAA_CODE_SND ; play sound
+            JP      z,SAA_SEQ_SOUND_PLAY 
+            CP      SAA_CODE_DEL ; delay
+            JP      z,ALL_SEQ_DELAY 
+            CP      SAA_CODE_VOL ; volume
+            JP      z,SAA_SEQ_VOLUME 
+            CP      SAA_CODE_END 
+            JP      z,SAA_SEQ_DONE 
+
+SAA_SEQ_SOUND_PLAY:  ; SAA_CODE_SND,<channel>,<frequency>
+            INC     hl 
+            LD      a,(hl) ; channel
+            ADD     a,$08 
+            INC     C 
+            OUT     (C),a 
+            DEC     C 
+            INC     HL 
+            LD      a,(hl) 
+            OUT     (C),a 
+            INC     hl 
+            JP      U0_PLAYER_LOOP 
+
+SAA_SEQ_DELAY:       
+; same as TVC_DELAY
+
+SAA_SEQ_VOLUME:      ; SN_CODE_VOL, <channel>,<volume>
+            INC     hl 
+            LD      a,(hl) ; channel
+            LD      b,a 
+            INC     hl 
+            LD      a,(hl) 
+            CP      $00 
+            PUSH    af 
+            CALL    z,SAA_DISABLE_VOICE 
+            CALL    NZ,SAA_ENABLE_VOICE 
+            INC     C 
+            OUT     (C),b 
+            POP     af 
+            DEC     c 
+            OUT     (C),a 
+            INC     hl 
+            JP      U0_PLAYER_LOOP 
+
+SAA_DISABLE_VOICE:   
+            PUSH    hl 
+            LD      hl,SAA_VOICE_DISABLE_MASKS 
+            LD      e,b 
+            LD      d,00 
+            ADD     hl,de 
+            LD      a,(hl) ; dis mask loaded
+            LD      hl,SAA_VOICE_ENABLED 
+            AND     (hl) 
+            LD      (hl),a 
+            INC     c 
+            LD      a,$14 
+            OUT     (C),a 
+            DEC     C 
+            LD      a,(hl) 
+            OUT     (C),a 
+            POP     hl 
+            XOR     a ; set Z
+            RET      
+
+SAA_ENABLE_VOICE:    
+            PUSH    hl 
+            LD      hl,SAA_VOICE_ENABLE_MASKS 
+            LD      e,b 
+            LD      d,00 
+            ADD     hl,de 
+            LD      a,(hl) ; en mask loaded
+            LD      hl,SAA_VOICE_ENABLED 
+            OR      (hl) 
+            LD      (hl),a 
+            INC     c 
+            LD      a,$14 
+            OUT     (C),a 
+            DEC     C 
+            LD      a,(hl) 
+            OUT     (C),a 
+            POP     hl 
+            RET      
+
+
+SAA_SEQ_DONE:        
+            INC     C 
+            LD      a,$1c 
+            OUT     (c),A 
+            XOR     A 
+            DEC     C 
+            OUT     (C),a 
+            RET      
+
+SAA_VOICE_ENABLED:   
+            DB      0 
+
+SAA_VOICE_DISABLE_MASKS:  
+            DB      11111110b,11111101b,11111011b,11110111b,11101111b,11011111b 
+
+SAA_VOICE_ENABLE_MASKS:  
+            DB      $01,$02,$04,$08,$10,$20 
+
+
+; C3 is 130.81Hz
+
+; C3 is 18 in the 0x02 octave
+; (( C - 12200) * 255 + 6100) / 12200
+
+; D3 is 146.83 Hz
+; D3 is 52 in the 0x02 octave
+
+
+; (freq - OctaveLow) * (255 / (OctaveHigh-OctaveLow))
+
+
+
+SAA_SEQUENCE:        
+            DB      SAA_CODE_SND,0,33,SAA_CODE_VOL,0,$F0 
+            DB      SAA_CODE_DEL,$80 
+            DB      SAA_CODE_SND,1,33,SAA_CODE_VOL,1,$A0 
+            DB      SAA_CODE_DEL,$70 
+            DB      SAA_CODE_VOL,0,$E0,SAA_CODE_VOL,1,$80 
+            DB      SAA_CODE_DEL,$30 
+            DB      SAA_CODE_VOL,0,$D0,SAA_CODE_VOL,1,$60 
+            DB      SAA_CODE_DEL,$30 
+            DB      SAA_CODE_VOL,0,$C0,SAA_CODE_VOL,1,$50 
+            DB      SAA_CODE_DEL,$30 
+
+            DB      SAA_CODE_SND,2,85,SAA_CODE_VOL,2,$0F 
+            DB      SAA_CODE_DEL,$80 
+            DB      SAA_CODE_SND,3,85,SAA_CODE_VOL,3,$0A 
+            DB      SAA_CODE_DEL,$70 
+            DB      SAA_CODE_VOL,0,$B0,SAA_CODE_VOL,1,$40 
+            DB      SAA_CODE_VOL,2,$0E,SAA_CODE_VOL,3,$08 
+            DB      SAA_CODE_DEL,$30 
+            DB      SAA_CODE_VOL,0,$A0,SAA_CODE_VOL,1,$30 
+            DB      SAA_CODE_VOL,2,$0D,SAA_CODE_VOL,3,$06 
+            DB      SAA_CODE_DEL,$30 
+            DB      SAA_CODE_VOL,0,$50,SAA_CODE_VOL,1,$20 
+            DB      SAA_CODE_VOL,2,$0C,SAA_CODE_VOL,3,$05 
+            DB      SAA_CODE_DEL,$30 
+
+            DB      SAA_CODE_SND,4,132,SAA_CODE_VOL,4,$FF 
+            DB      SAA_CODE_DEL,$80 
+            DB      SAA_CODE_SND,5,132,SAA_CODE_VOL,5,$AA 
+            DB      SAA_CODE_DEL,$70 
+            DB      SAA_CODE_VOL,2,$0B,SAA_CODE_VOL,3,$04 
+            DB      SAA_CODE_VOL,4,$EE,SAA_CODE_VOL,5,$88 
+            DB      SAA_CODE_DEL,$30 
+            DB      SAA_CODE_VOL,2,$0A,SAA_CODE_VOL,3,$03 
+            DB      SAA_CODE_VOL,4,$DD,SAA_CODE_VOL,5,$66 
+            DB      SAA_CODE_DEL,$30 
+            DB      SAA_CODE_VOL,2,$09,SAA_CODE_VOL,3,$03 
+            DB      SAA_CODE_VOL,4,$CC,SAA_CODE_VOL,5,$55 
+            DB      SAA_CODE_DEL,$30 
+            DB      SAA_CODE_VOL,2,$08,SAA_CODE_VOL,3,$03 
+            DB      SAA_CODE_VOL,4,$BB,SAA_CODE_VOL,5,$44 
+            DB      SAA_CODE_DEL,$30 
+            DB      SAA_CODE_VOL,2,$06,SAA_CODE_VOL,3,$02 
+            DB      SAA_CODE_VOL,4,$AA,SAA_CODE_VOL,5,$33 
+            DB      SAA_CODE_DEL,$30 
+            DB      SAA_CODE_VOL,2,$05,SAA_CODE_VOL,3,$02 
+            DB      SAA_CODE_VOL,4,$50,SAA_CODE_VOL,5,$22 
+            DB      SAA_CODE_DEL,$A0 
+            
+            
+            
+            
+            
+            DB      SAA_CODE_VOL,0,$00,SAA_CODE_VOL,1,$00 
+            DB      SAA_CODE_VOL,2,$00,SAA_CODE_VOL,3,$00 
+            DB      SAA_CODE_VOL,4,$00,SAA_CODE_VOL,5,$00 
+
+
+            DB      SAA_CODE_END 
+
+
+

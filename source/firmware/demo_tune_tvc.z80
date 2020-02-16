@@ -1,0 +1,81 @@
+U0_DEMO_TVC:         
+TVC_CODE_SND =      0 
+TVC_CODE_DEL =      1 
+TVC_CODE_VOL =      2 
+TVC_CODE_END =      3 
+
+
+            LD      hl,DEMO_TVC_STR 
+            CALL    PRINT_ISTRING 
+
+            LD      hl,TVC_SEQUENCE 
+            CALL    U0_PLAYER_LOOP 
+            RET      
+
+TVC_PLAYER:          
+            LD      a,b 
+            CP      TVC_CODE_SND ; play sound
+            JP      z,TVC_SEQ_SOUND_PLAY 
+            CP      TVC_CODE_DEL ; delay
+            JP      z,ALL_SEQ_DELAY 
+            CP      TVC_CODE_VOL ; volume
+            JP      z,TVC_SEQ_VOLUME 
+            CP      TVC_CODE_END 
+            JP      z,TVC_SEQ_DONE 
+
+; cp $03 ; done
+; ret z
+TVC_SEQ_DONE:        
+            XOR     a ; sound off, pithc doesn't matter
+            OUT     (5),a 
+            RET      
+TVC_SEQ_SOUND_PLAY:  
+            INC     hl 
+            LD      a,(hl) 
+            OUT     (4),a 
+            INC     hl 
+            LD      a,(hl) 
+            AND     $0F ; only pitch
+            OR      $10 ; sound enable
+            OUT     (5),a 
+            INC     hl 
+            JP      U0_PLAYER_LOOP 
+
+TVC_SEQ_VOLUME:      
+            INC     hl 
+            LD      a,(hl) 
+            INC     hl 
+            SLA     a 
+            SLA     a 
+            OR      $80 ; printer STROBE INACTIVE
+            OUT     (6),a 
+            JP      U0_PLAYER_LOOP 
+
+
+; f = 195312.5 / (4096 - p)
+; p = 4096 - ( 195312.5 / f )
+; f = 48 ..
+
+TVC_SEQUENCE:        
+;            db TVCFREQ 150
+            DB      TVC_CODE_VOL,13,TVC_CODE_SND,lsb(4096 - ( 19531250 / C )),msb((4096 - ( 19531250 / C ))) 
+            DB      TVC_CODE_DEL,$F0 
+            DB      TVC_CODE_VOL,13,TVC_CODE_DEL,$30 
+            DB      TVC_CODE_VOL,12,TVC_CODE_DEL,$30 
+            DB      TVC_CODE_VOL,10,TVC_CODE_DEL,$30 
+            DB      TVC_CODE_VOL,13,TVC_CODE_SND,lsb((4096 - ( 19531250 / D )) ),msb((4096 - ( 19531250 / D )) ) 
+            DB      TVC_CODE_DEL,$F0 
+            DB      TVC_CODE_VOL,13,TVC_CODE_DEL,$30 
+            DB      TVC_CODE_VOL,12,TVC_CODE_DEL,$30 
+            DB      TVC_CODE_VOL,10,TVC_CODE_DEL,$30 
+            DB      TVC_CODE_VOL,13,TVC_CODE_SND,lsb((4096 - ( 19531250 / E )) ),msb((4096 - ( 19531250 / E )) ) 
+            DB      TVC_CODE_DEL,$F0 
+            DB      TVC_CODE_VOL,13,TVC_CODE_DEL,$30 
+            DB      TVC_CODE_VOL,12,TVC_CODE_DEL,$30 
+            DB      TVC_CODE_VOL,10,TVC_CODE_DEL,$30 
+            DB      TVC_CODE_VOL,8,TVC_CODE_DEL,$30 
+            DB      TVC_CODE_VOL,4,TVC_CODE_DEL,$30 
+            DB      TVC_CODE_VOL,2,TVC_CODE_DEL,$30 
+            DB      TVC_CODE_VOL,0,TVC_CODE_DEL,$A0 
+            DB      TVC_CODE_END 
+

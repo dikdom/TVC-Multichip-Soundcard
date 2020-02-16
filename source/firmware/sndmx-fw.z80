@@ -1,0 +1,443 @@
+; v1.0.1 YM reset implemented
+; v1.0   Final, released version
+;        - Bankswitch enabled, bank 2-3 is used if possible
+;        - SAA1099 tunes (C-D-E) is fixed, rythm of the three notes
+;          are harmonized among the TVC-SN-SAA chips
+; v0.6.1 SAA1099 uses the SAM Coupee doc defined
+;          chromatic tones, For details check this:
+;          https://sam.speccy.cz/systech/sam-coupe_tech-man_v3-0.pdf
+;        - bankswitch disabled, fixed 1 bank
+; v0.6   Almost final, release version
+;        - Comments fixed in bank 2
+;        - Debug routines are refactored to a different source file
+;        - Instead of striping a green color pulse on border is done
+;        - No white border during demo play
+;        - Sources are formatted
+;        - Init text de-capitalized
+;        - SAA test tune still doesn't work
+; v0.5.4 Bank switch fixed
+; v0.5.3 Detect other bank, SAA music included
+; v0.5.2 Change init order of SAA, first enable sound
+;        limit: volume 2000ns (7 T time minimum)
+;               500 ns otherwise (2T - practically no limit in TVC)
+; v0.5 - Fixed SAA tune frequencies - NOT WORKING!!
+; v0.5.1 implemented envelop reset on test tune
+
+; v0.4 - all colors stripes on startup
+;        red-black color stripes on not found
+
+; v0.3 - ready to deploy version.
+;        TVC, SN and SAA tones are ready
+;        YM plays a demo song from vgmrips.net
+
+
+VERSION_MAJOR EQU   1 
+VERSION_MINOR EQU   "0.1" 
+CARD_SHORT_NAME EQU "SndMx" 
+
+CHARSETADDR EQU     $DD00 
+CHAR_CAPITALS EQU   CHARSETADDR 
+CHAR_NUM    EQU     CHAR_CAPITALS + (32*8) 
+CHAR_SMALL  EQU     CHAR_NUM + (32*8) 
+
+            .ORG    $2000 
+SLOTID:              
+            DB      0 
+PORTBASE:            
+            DB      0 
+FC_SLOT:             
+            DB      0 
+FC_PORT:             
+            DB      0 
+
+CHARPOS_ADDR:        
+            DW      0 
+CHARPOS_XY:          
+            DW      0 
+PROTO_BOARD:         
+            DB      0 ; 0 - no bankswitching, 1 - bankswitch implemented
+U0_ROUTINE_TARGET:   
+            DW      $1975 
+
+; For the sake of easy testing...
+            .ORG    $0070 
+            DB      5 
+            DB      CARD_SHORT_NAME 
+
+            .ORG    $00D0 
+            DB      5 
+            DB      CARD_SHORT_NAME 
+; --- End testing sake...
+
+            .BINFROM $6000 
+            .BINTO  $E000 
+            .ENT    INIT 
+
+
+            .ORG    $C000 
+            DB      "MOPS" 
+CARD_SHORT_NAME_LENGTH:  
+            DB      5 
+CARD_SHORT_NAME:     
+            DB      CARD_SHORT_NAME 
+            .ORG    $C00B 
+            DW      init 
+
+            .ORG    $C010 
+VERSION_BYTES:       
+            DB      version_major 
+            DB      version_minor 
+
+CARD_FULL_NAME:      
+            DB      "*** TVC Multichip Soundcard v" 
+            DB      version_major+"0" 
+            DB      "." 
+            DB      version_minor 
+            DB      "  by Sanyi ***" 
+            .ISTR   "\r\n\r\n\r\n" 
+
+SLOT_STR:            
+            .ISTR   "Used slot: #" 
+BASE_PRT_STR:        
+            .ISTR   "\r\nBase port address: $" 
+
+PROCEED_STR:         
+            .ISTR   "\r\n\r\nPress SPACE to some test tunes" 
+SPACE_PRESSED_STR:   
+            .ISTR   "\r\n\r\nSPACE pressed, demo sequence starts\r\n" 
+BOARD_TYPE_PROTO_STR:  
+            .ISTR   "\r\nProto board detected" 
+BOARD_TYPE_V13_STR:  
+            .ISTR   "\r\nv1.3+ board detected" 
+
+
+            .ORG    $C100 
+; BANK SWITCHING METHODS
+CHECK_BOARD_TYPE:    
+            LD      a,$00 
+            LD      (PROTO_BOARD),a 
+            LD      a,(PORTBASE) 
+            ADD     a,$06 
+            LD      c,a 
+            LD      a,00000010b 
+            OUT     (C),a 
+; if the code continues from here, then this is a simple proto board
+            RET      
+            NOP      ; mask the JR method on the other bank
+
+CALL_ON_BANK_2:      
+            LD      a,(PORTBASE) 
+            ADD     a,$06 
+            LD      c,a 
+            LD      a,00000010b 
+            OUT     (C),a 
+            RET      
+
+INIT:                
+            DI       
+            LD      ($0100),SP 
+            LD      sp,$7FFF 
+
+            CALL    BORDER_PULSE 
+
+; border color
+            XOR     a 
+            OUT     (0),a 
+; init port base
+            LD      (PORTBASE),a 
+            LD      (FC_SLOT),a 
+
+            CALL    SCAN_SLOTS 
+
+            LD      a,(PORTBASE) 
+            CP      $00 
+            JR      z,INIT_FAILED_NO_CARD_FOUND 
+
+            LD      a,($0B21) 
+            INC     a 
+            JR      z,INIT_DONE 
+
+            CALL    INIT_SCREEN 
+
+            CALL    CHECK_BOARD_TYPE 
+
+            CALL    PRINT_SCREEN 
+
+            CALL    WAIT_FOR_SPACE 
+
+            JR      INIT_DONE 
+INIT_FAILED_NO_CARD_FOUND:  
+            LD      bc,0 
+FAIL_LOOP:           
+            LD      a,8 
+            OUT     (0),a 
+            XOR     a 
+            NOP      
+            NOP      
+            OUT     (0),a 
+            DEC     c 
+            JR      nz,fail_loop 
+            DJNZ    fail_loop 
+INIT_DONE:           
+            LD      SP,($0100) 
+            RET      
+
+SCAN_SLOTS:          
+            XOR     a 
+            LD      (SLOTID),a 
+            LD      a,$10 
+            PUSH    af 
+            LD      de,$0040 
+            PUSH    de 
+SLOT_CHECK:          
+            LD      bc,6 
+            LD      hl,CARD_SHORT_NAME_LENGTH 
+LOOP_CHECK:          
+            LD      a,(de) 
+            CPI      
+            JR      nz,PROCEED_TO_NEXT 
+            INC     de 
+            JP      pe,LOOP_CHECK 
+ONE_CARD_FOUND:      
+            POP     de 
+            POP     af 
+            PUSH    af 
+            PUSH    de 
+            LD      (PORTBASE),a 
+            LD      b,a 
+            LD      a,(FC_SLOT) 
+            CP      $00 
+            JR      nz,ALREADY_FILLED 
+            LD      a,b 
+            LD      (FC_PORT),a 
+            LD      a,(SLOTID) 
+            LD      (FC_SLOT),a 
+ALREADY_FILLED:      
+            CALL    init_chips 
+            JR      PROCEED_TO_NEXT 
+
+PROCEED_TO_NEXT:     
+            LD      hl,SLOTID 
+            INC     (hl) 
+            POP     de 
+            EX      de,hl 
+            LD      de,$0030 
+            ADD     hl,de 
+            EX      de,hl 
+            POP     af 
+            ADD     a,$10 
+            CP      $50 
+            RET     z 
+            PUSH    af 
+            PUSH    de 
+            JR      SLOT_CHECK 
+
+SET_BASE:            
+            LD      a,(SLOTID) 
+            INC     a 
+            RLCA     
+            RLCA     
+            RLCA     
+            RLCA     
+            LD      (PORTBASE),a 
+            RET      
+
+INIT_CHIPS:          
+            CALL    INIT_SN 
+            CALL    INIT_SAA 
+            CALL    INIT_YM3812 
+            RET      
+
+INIT_SN:             
+            LD      a,(PORTBASE) 
+            LD      c,a 
+; mute all channels of SN76489
+            LD      a,10011111b 
+            OUT     (c),a 
+            CALL    delay_sn ; delay at leat 28T (in fact it is 17+10+7 with the ld)
+            LD      a,10111111b 
+            OUT     (c),a 
+            CALL    delay_sn 
+            LD      a,11011111b 
+            OUT     (c),a 
+            CALL    delay_sn 
+            LD      a,11111111b 
+            OUT     (c),a 
+DELAY_SN:            
+            RET      
+
+INIT_SAA:            
+            LD      a,(PORTBASE) 
+            ADD     a,3 
+            LD      c,a 
+            LD      a,$1C ; Freq reset & Enable
+            OUT     (c),a 
+            DEC     c 
+            LD      a,2 ; reset freq and DISABLE all channel
+            OUT     (c),a 
+            RET      
+INIT_YM3812:
+            ld a,(PORTBASE)
+            add a,4
+            ld c,a
+            ld b,0
+            xor a
+YM_ZERO_LOOP:
+            out (C),b ; must be 12T between addr and data write (3.3us)
+            inc c ; 4T
+            nop   ; 4T
+            nop   ; 4T (sum: 12T)
+            out (c),a ; must be 71T between data and addr write (23 us)
+            dec c ; 4T
+            inc b ; 4T
+            call delay_ym_zero ; 27T (call 17 + ret 10)
+            call delay_ym_zero ; 27T (call 17 + ret 10)
+            jr nz,YM_ZERO_LOOP ; 12T  (sum: 74T)
+delay_ym_zero:
+            RET      
+PRINT_SCREEN:        
+            LD      bc,$0903 
+            CALL    SET_POS 
+            LD      hl,CARD_FULL_NAME 
+            CALL    PRINT_ISTRING 
+            LD      hl,SLOT_STR 
+            CALL    PRINT_ISTRING 
+            LD      a,(FC_SLOT) 
+            CALL    PRINT_NUM1 
+
+            LD      hl,BASE_PRT_STR 
+            CALL    PRINT_ISTRING 
+            LD      a,(FC_PORT) 
+            CALL    PRINT_NUM2 
+
+            LD      a,(PROTO_BOARD) 
+            CP      $00 
+            JR      nz,PRINT_FINAL_BOARD_DETECTED 
+            LD      hl,BOARD_TYPE_PROTO_STR 
+            JR      PRINT_BOARD_TYPE 
+PRINT_FINAL_BOARD_DETECTED:  
+            LD      hl,BOARD_TYPE_V13_STR 
+PRINT_BOARD_TYPE:    
+            CALL    PRINT_ISTRING 
+
+            LD      hl,PROCEED_STR 
+            CALL    PRINT_ISTRING 
+            RET      
+
+WAIT_FOR_SPACE:      
+            LD      hl,U0_ROUTINE_SOURCE 
+            LD      de,U0_ROUTINE_TARGET 
+            LD      bc,U0_ROUTINE_SOURCE_END - U0_ROUTINE_SOURCE 
+            LDIR     
+            CALL    U0_ROUTINE_TARGET 
+            RET      
+
+BORDER_PULSE:        
+            LD      HL,BORDER_COLORS 
+            LD      e,7 
+BORDER_PULSE_SET_COLOR:  
+            LD      a,(hl) 
+            OUT     (0),a 
+
+            LD      bc,$0040
+BORDER_PULSE_LOOP_1:  
+            DEC     b 
+            JR      nz,BORDER_PULSE_LOOP_1 
+            DEC     c 
+            JR      nz,BORDER_PULSE_LOOP_1 
+            INC     hl 
+            DEC     e 
+            JR      nz,BORDER_PULSE_SET_COLOR 
+            RET      
+
+
+BORDER_COLORS:       
+            DB      0,00100000b,10100000b,10101010b,10100000b,00100000b,0 
+
+U0_ROUTINE_SOURCE:   
+            .PHASE  U0_ROUTINE_TARGET 
+            CALL    U0_IO_MEM_SELECT_TO_A 
+            OR      7 
+            OUT     (3),a 
+            LD      b,$03 
+U0_SPACE_CHECK_LOOP_0:  
+            LD      c,$01 
+U0_SPACE_CHECK_LOOP_1:  
+            LD      hl,$FFFF 
+U0_SPACE_CHECK_LOOP_2:  
+            IN      a,($58) 
+            BIT     5,a 
+            JR      z,U0_SPACE_PRESSED 
+            DEC     hl 
+            XOR     a 
+            CP      h 
+            JR      nz,U0_SPACE_CHECK_LOOP_2 
+            DEC     c 
+            CP      c 
+            JR      nz,U0_SPACE_CHECK_LOOP_1 
+            LD      a,"." 
+            CALL    PRINT_CHARACTER 
+            DJNZ    U0_SPACE_CHECK_LOOP_0 
+
+            CALL    U0_IO_MEM_SELECT_TO_A 
+            OUT     (3),a 
+            RET      
+
+U0_SPACE_PRESSED:    
+
+            LD      hl,SPACE_PRESSED_STR 
+            CALL    PRINT_ISTRING 
+
+            CALL    U0_DEMO_TVC 
+            CALL    U0_DEMO_SN 
+            CALL    U0_DEMO_SAA 
+            CALL    U0_DEMO_YM 
+U0_CHECK_SPACE_RELEASED:  
+            LD      b,$FF 
+            NOP      
+            DJNZ    U0_CHECK_SPACE_RELEASED+2 
+            IN      a,($58) 
+            BIT     5,a 
+            JR      z,U0_CHECK_SPACE_RELEASED 
+            RET      
+
+U0_IO_MEM_SELECT_TO_A:  
+            LD      a,(FC_SLOT) 
+            RRCA     
+            RRCA     
+            AND     $C0 
+            RET      
+            .INCLUDE demo_tunes.z80 
+U0_ROUTINE_TARGET_END:  
+            .DEPHASE  
+U0_ROUTINE_SOURCE_END:  
+
+            LD      b,$04 
+            XOR     a 
+WFS_LOOP_INIT1:      
+            LD      c,$02 
+WFS_LOOP_INIT2:      
+            LD      hl,$FFFF 
+WFS_LOOP:            
+            DEC     hl 
+            CP      h 
+            JR      nz,WFS_LOOP 
+            DEC     c 
+            JR      nz,WFS_LOOP_INIT2 
+            LD      a,"." 
+            CALL    PRINT_CHARACTER 
+            DJNZ    WFS_LOOP_INIT1 
+            RET      
+
+            .INCLUDE "screen.z80" 
+
+            .ORG    CHARSETADDR 
+            .INCLUDE "charset.z80" 
+
+            .INCLUDE "bank00-01.z80" 
+            .INCLUDE "bank02.z80" 
+
+
+
+
+
